@@ -4,29 +4,54 @@
 
 ## Last update
 
-**2026-05-03** — Marcus (Phase 1: Project setup done)
+**2026-05-03** — Marcus (Step 1 in progress: Scaffold + Auth-Shell written, awaiting `npm install` + Magic-Link-Test)
 
 ## Current state
 
-🔵 **Phase 1 done — ready for Build (MVP Step 1)**
+🟡 **Step 1: Scaffold geschrieben, awaiting Aleksa's `npm install` + first preview**
 
-- ✅ Spec approved by Aleksa (`SPEC.md`)
-- ✅ Local repo created at `~/Desktop/Projects/aleksa-ai-app/`
-- ✅ Supabase project erstellt (`puimwizupgkdvxpanlhy`, Account `aleksa@spalevic-consulting.de`) mit RLS-auto-on
-- ✅ `BUILD-PLAN.md` mit 10 numbered MVP steps geschrieben
-- ✅ Standard files in repo: SPEC.md, CLAUDE.md, HANDOFF.md, README.md, .env.example, .env.local (gitignored), .gitignore
-- ⏳ Aleksa: GitHub-Repo `aleksaai/aleksa-ai-app` erstellen + lokales Repo connecten + erste Pushup
-- ⏳ Aleksa: Stripe Tax in Account 2 aktivieren (UI-Click)
-- ⏳ Aleksa: Stripe Customer Portal konfigurieren (Branding für app.aleksa.ai)
+### Phase 1 ✅
+- Spec approved + Build-Plan geschrieben
+- Repo erstellt mit allen Standard-Files
+- GitHub-Repo `aleksaai/aleksa-ai-app` aktiviert
+- Stripe Tax in Account 1 aktiviert (Aleksa's Entscheidung — Voice-Agent-Customers laufen über Account 1, getaggt mit `metadata: source=aleksa-ai-app` für Lisa-Filterung)
+- Stripe Customer Portal konfiguriert
+- Resend API Key in neuem Supabase als Secret gespeichert
+
+### Step 1 — done so far
+- ✅ `package.json` mit allen MVP-Dependencies (React 18, Vite 5, Tailwind 3, Supabase, Stripe, Motion, React Router)
+- ✅ Vite + TS + Tailwind config files
+- ✅ `index.html` + `src/main.tsx` mit `BrowserRouter` + `AuthProvider` Wrapper
+- ✅ `src/lib/supabase.ts` — Supabase client init
+- ✅ `src/lib/auth.tsx` — `AuthProvider` Context, lädt `profiles`-Row wenn user logged in
+- ✅ `src/components/RequireAuth.tsx` — Route-Wrapper mit optional `requireRole`
+- ✅ `src/pages/Login.tsx` — Magic-Link-Form mit Motion-Animationen
+- ✅ `src/pages/Admin.tsx` + `src/pages/Dashboard.tsx` — Placeholder-Pages
+- ✅ `src/App.tsx` — Routes mit role-based redirect (`/` → Login OR `/admin` OR `/dashboard`)
+- ✅ Tailwind theme mit `brand` color palette (#66A4FF) + Inter font
+- ✅ Shared component classes in `index.css` (`.btn-primary`, `.input`, `.card`)
+
+### Step 1 — pending
+- ⏳ Aleksa: `npm install` im Terminal (`cd ~/Desktop/Projects/aleksa-ai-app && npm install`)
+- ⏳ Marcus: `preview_start` → verify Login page rendert sauber
+- ⏳ Aleksa: Magic-Link-Test mit `info@aleksa.ai`, prüft dass Login-Mail ankommt + Klick-zum-Admin funktioniert
 
 ## What's next
 
-**Step 1 of `BUILD-PLAN.md`** — Vite-Scaffold + Supabase-Client + Auth-Shell + Magic-Link-Login.
+1. **Aleksa:** `cd ~/Desktop/Projects/aleksa-ai-app && npm install` (~1 Min)
+2. **Marcus:** Preview starten + Verifikation
+3. **Aleksa:** Magic-Link-Test
+4. Wenn ✅ → Step 2 (Database Schema + RLS)
 
-Aleksa öffnet eine neue Claude Code Session in diesem Verzeichnis und sagt:
-> "Marcus, leg los mit Step 1 aus BUILD-PLAN.md."
+## Decisions made
 
-Marcus dann: spec/build-plan reading → execution → acceptance check → HANDOFF.md updaten.
+- **Naming:** `aleksa-ai-app` (Repo) + `app.aleksa.ai` (Subdomain). Brand bleibt "AleksaAI"
+- **Supabase:** separates Projekt unter `aleksa@spalevic-consulting.de` Account, NICHT claude-team's Supabase
+- **Stripe Account 1** (`acct_1RlQZ6JH4KmjuYHx`) — Aleksas Wahl; Voice-Agent-Subscriptions kriegen `metadata: source=aleksa-ai-app` für Lisa
+- **Stripe Tax:** AN
+- **Stripe Pricing-Modell:** Tiered Metered Billing
+- **Customer-Selfservice am Voice Agent:** kommt in V1
+- **Subdomain pro Customer:** kommt in V2
 
 ## Decisions made
 

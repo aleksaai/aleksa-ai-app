@@ -14,8 +14,9 @@ These need to happen ONCE before Step 1:
 
 - [ ] **GitHub:** `gh repo create aleksaai/aleksa-ai-app --private --source=. --push` (oder manuell auf github.com)
 - [ ] **Stripe Tax aktivieren:** Stripe Dashboard (Account 2) → Settings → Tax → Activate. Wähle Hungary als origin country. Für EU B2B: Reverse-Charge automatisch
-- [ ] **Stripe API Keys holen:** Account 2 → Developers → API keys → kopiere `sk_live_...` (Secret) + `pk_live_...` (Publishable) → in `.env.local`
+- [ ] **Stripe API Keys holen:** Account 1 → Developers → API keys → kopiere TEST-Mode-Keys (`sk_test_...` + `pk_test_...`) für Build → in `.env.local`. Live-Mode-Keys kommen zu Step 10
 - [ ] **Stripe Webhook Endpoint provisorisch anlegen:** Stripe Dashboard → Developers → Webhooks → "Add endpoint" — Endpoint-URL kommt erst in Step 5, aber Signing-Secret schon mal kopieren in `.env.local` als `STRIPE_WEBHOOK_SECRET`
+- [ ] **Metadata-Convention beachten:** ALLE Stripe-Objects (Customers, Subscriptions, Invoices) die wir erstellen kriegen `metadata: {source: "aleksa-ai-app"}` — damit kann Lisa sie in der Buchhaltung von KI-Schule-Charges trennen
 - [ ] **Resend API Key:** Resend-Dashboard → API Keys → Create → in `.env.local`
 
 ---

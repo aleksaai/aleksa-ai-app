@@ -16,7 +16,7 @@ Whitelabel-Plattform die Aleksas ElevenLabs-Voice-Agent-Reseller-Business hostet
 - **UI sourcing:** 21st Dev Magic (`magic_component_inspiration`) für Bausteine
 - **Auth/DB/Cron:** Supabase Project `puimwizupgkdvxpanlhy` (separat von claude-team `znltfcxpngtztiwbcamm`)
 - **Backend:** Supabase Edge Functions (Deno)
-- **Payments:** Stripe Account 2 (`acct_1SQ5j7DGrn0Qd55h` — Client Services), Tiered Metered Billing + Tax aktiv
+- **Payments:** Stripe Account 1 (`acct_1RlQZ6JH4KmjuYHx`), Tiered Metered Billing + Tax aktiv. **Wichtig:** Alle Stripe-Customers + Subscriptions die hier erstellt werden, kriegen Metadata `{"source": "aleksa-ai-app"}` damit Lisa sie in der monatlichen Buchhaltung von KI-Schule/Tech-Support-Charges trennen kann
 - **Email:** Resend (sender `noreply@projekt.aleksa.ai`, Domain bereits verifiziert)
 - **Voice:** ElevenLabs Conversational AI via existing `elevenlabs-bridge` Edge Function (in claude-team Supabase, cross-project call)
 

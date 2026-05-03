@@ -155,7 +155,7 @@ customer_invitations
 ## 7. Externe APIs
 
 - **Supabase** (`puimwizupgkdvxpanlhy`): Auth, DB, RLS, Edge Functions, pg_cron
-- **Stripe** (Account 2 / Client Services): Tiered Metered Billing, Tax (an), Customer Portal, Webhooks
+- **Stripe** (Account 1 — `acct_1RlQZ6JH4KmjuYHx`, mit Metadata-Tag `source=aleksa-ai-app` für Lisa-Filterung): Tiered Metered Billing, Tax (an), Customer Portal, Webhooks
 - **ElevenLabs:** `post_call_webhook` zeigt auf `webhook-elevenlabs`. `elevenlabs-bridge` (existiert in claude-team Supabase) für `patch_agent`
 - **Resend:** Customer-Invitation-Mails (sender `noreply@projekt.aleksa.ai`)
 
