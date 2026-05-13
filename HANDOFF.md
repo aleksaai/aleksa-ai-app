@@ -4,11 +4,13 @@
 
 ## Last update
 
-**2026-05-03** — Marcus (Step 1 in progress: Scaffold + Auth-Shell written, awaiting `npm install` + Magic-Link-Test)
+**2026-05-13** — Marcus (Session-Close: Step 1+2 Code done + zu GitHub gepusht, Token-Bug gefixed, awaiting Netlify + SQL-Exec von Aleksa)
 
 ## Current state
 
-🟡 **Step 1: Scaffold geschrieben, awaiting Aleksa's `npm install` + first preview**
+🟡 **Step 1 + 2 Code complete, awaiting Aleksa: SQL-Migration ausführen + Netlify connecten**
+
+**Nicht versuchen:** lokales `npm run dev` oder `preview_start`. Auf Aleksas MacBook (User `aleksaspalevic`) ist Node NICHT installiert — Frontend wird ausschließlich über Netlify gebaut + getestet. Siehe Marcus knowledge.md "Node-loses Development auf Aleksas MacBook".
 
 ### Phase 1 ✅
 - Spec approved + Build-Plan geschrieben
@@ -31,23 +33,38 @@
 - ✅ Tailwind theme mit `brand` color palette (#66A4FF) + Inter font
 - ✅ Shared component classes in `index.css` (`.btn-primary`, `.input`, `.card`)
 
-### Step 1 — pending
-- ⏳ Aleksa: `npm install` im Terminal (`cd ~/Desktop/Projects/aleksa-ai-app && npm install`)
-- ⏳ Marcus: `preview_start` → verify Login page rendert sauber
-- ⏳ Aleksa: Magic-Link-Test mit `info@aleksa.ai`, prüft dass Login-Mail ankommt + Klick-zum-Admin funktioniert
+### Step 1 — done (alles Code-mässig, ohne lokales Preview)
+- ✅ Code geschrieben + zu GitHub gepusht (3 Commits auf main)
+- Build wird auf Netlify passieren, nicht lokal
 
-## What's next
+### Step 2 — SQL written, awaiting Aleksa execution
+- ✅ `supabase/migrations/001_initial_schema.sql` — 7 Tabellen + RLS-Policies + handle_new_user Trigger + Helper-Functions
+- ⏳ Aleksa: im Supabase Dashboard SQL Editor paste + Run
+- ⏳ Aleksa: nach erstem Magic-Link-Login das eigene Profile zu admin promoten:
+  ```sql
+  update profiles set role = 'admin' where id = (select id from auth.users where email = 'info@aleksa.ai');
+  ```
 
-1. **Aleksa:** `cd ~/Desktop/Projects/aleksa-ai-app && npm install` (~1 Min)
-2. **Marcus:** Preview starten + Verifikation
-3. **Aleksa:** Magic-Link-Test
-4. Wenn ✅ → Step 2 (Database Schema + RLS)
+## What's next (Aleksa pending)
+
+1. **SQL-Migration ausführen:** Supabase Dashboard `puimwizupgkdvxpanlhy` → SQL Editor → paste content of `supabase/migrations/001_initial_schema.sql` (RAW von GitHub holen) → Run
+2. **Netlify connecten:**
+   - Add new site → Import from GitHub → `aleksaai/aleksa-ai-app`
+   - Build: `npm run build` / Publish: `dist`
+   - Env vars: `NODE_VERSION=22`, `VITE_SUPABASE_URL=https://puimwizupgkdvxpanlhy.supabase.co`, `VITE_SUPABASE_ANON_KEY=<aus Supabase Dashboard → Settings → API>`
+3. **Marcus in nächster Session:** öffnet Netlify-URL im Browser via Chrome-MCP-Tool → verifiziert Login-Page rendert
+4. **Aleksa:** Magic-Link-Test mit `info@aleksa.ai` auf der Netlify-URL → Profile zu admin promoten via SQL → Login bestätigt
+5. Wenn alles ✅ → Step 3 + 4 starten (Stripe-Setup-Verification + Customer-CRUD im Admin)
 
 ## Decisions made
 
 - **Naming:** `aleksa-ai-app` (Repo) + `app.aleksa.ai` (Subdomain). Brand bleibt "AleksaAI"
 - **Supabase:** separates Projekt unter `aleksa@spalevic-consulting.de` Account, NICHT claude-team's Supabase
 - **Stripe Account 1** (`acct_1RlQZ6JH4KmjuYHx`) — Aleksas Wahl; Voice-Agent-Subscriptions kriegen `metadata: source=aleksa-ai-app` für Lisa
+- **GitHub Token:** im Browser auf "All repositories" gesetzt (oder zumindest aleksa-ai-app hinzugefügt) — Push klappt
+- **Resend Key:** als Secret im neuen Supabase hinterlegt
+- **Stripe Tax aktiviert** + Customer Portal konfiguriert
+- **Lokales Node:** NICHT installiert auf MacBook. Build-Pattern via Netlify-Cloud, kein lokales `npm run dev`
 - **Stripe Tax:** AN
 - **Stripe Pricing-Modell:** Tiered Metered Billing
 - **Customer-Selfservice am Voice Agent:** kommt in V1
