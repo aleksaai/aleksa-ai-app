@@ -217,3 +217,28 @@ export async function getCustomerBillingPortalUrl() {
   if (!data || !(data as any).ok) throw new Error('Invalid response')
   return (data as { ok: true; url: string }).url
 }
+
+// ─── update-customer-business (business name + EU VAT ID) ─────
+
+export type UpdateBusinessInput = {
+  business_name?: string
+  vat_id?: string
+}
+
+export async function updateCustomerBusiness(input: UpdateBusinessInput) {
+  const { data, error } = await supabase.functions.invoke('update-customer-business', { body: input })
+  if (error) {
+    // Supabase functions client folds non-2xx into error.message — bubble up so UI shows it
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) {
+    const e = (data as any)?.error ?? 'unknown_error'
+    const detail = (data as any)?.detail ?? ''
+    throw new Error(`${e}${detail ? ': ' + detail : ''}`)
+  }
+  return data as {
+    ok: true
+    business_name: string | null
+    vat_id: { id: string; verification_status?: string } | null
+  }
+}

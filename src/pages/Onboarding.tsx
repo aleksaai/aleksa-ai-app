@@ -5,7 +5,7 @@ import { loadStripe, type Stripe } from '@stripe/stripe-js'
 import { Elements, useStripe, useElements, PaymentElement, AddressElement } from '@stripe/react-stripe-js'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import { getSetupIntent, linkInvitation } from '../lib/api'
+import { getSetupIntent, linkInvitation, updateCustomerBusiness } from '../lib/api'
 
 export function Onboarding() {
   const { user, signOut } = useAuth()
@@ -101,6 +101,9 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
   const navigate = useNavigate()
   const [submitting, setSubmitting] = useState(false)
   const [errMsg, setErrMsg] = useState('')
+  const [customerType, setCustomerType] = useState<'b2c' | 'b2b'>('b2c')
+  const [businessName, setBusinessName] = useState('')
+  const [vatId, setVatId] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -108,12 +111,30 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
     setSubmitting(true)
     setErrMsg('')
 
+    // 1. If B2B: set business name + VAT ID on Stripe Customer FIRST so that
+    //    Stripe Tax can apply Reverse-Charge when the subscription is later created.
+    if (customerType === 'b2b' && (businessName.trim() || vatId.trim())) {
+      try {
+        await updateCustomerBusiness({
+          business_name: businessName.trim() || undefined,
+          vat_id: vatId.trim() || undefined,
+        })
+      } catch (e) {
+        setErrMsg(
+          `Unternehmensdaten konnten nicht gespeichert werden: ${
+            e instanceof Error ? e.message : String(e)
+          }`
+        )
+        setSubmitting(false)
+        return
+      }
+    }
+
+    // 2. Persist the billing address + payment method via Stripe Elements
     const { error } = await stripe.confirmSetup({
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/dashboard`,
-        // Persist the billing address on the customer so Stripe Tax works
-        // when we later create the Subscription with automatic_tax enabled.
       },
       redirect: 'if_required',
     })
@@ -125,7 +146,6 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
     }
 
     onSuccess()
-    // Stripe webhook will set has_payment_method=true; navigate after a short delay
     setTimeout(() => navigate('/dashboard'), 1500)
   }
 
@@ -134,18 +154,79 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
       <div>
         <h1 className="text-xl font-semibold">Zahlungsmethode hinterlegen</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Du wirst noch nicht belastet. Wir hinterlegen deine Karte, damit wir
-          dich monatlich automatisch abrechnen können sobald der Admin ein
-          Pricing-Paket für dich aktiviert.
+          Du wirst noch nicht belastet. Wir hinterlegen deine Karte für die spätere
+          automatische Abrechnung.
         </p>
       </div>
 
+      {/* Customer type selector */}
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-700">Kundentyp</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setCustomerType('b2c')}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              customerType === 'b2c'
+                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Privatperson
+          </button>
+          <button
+            type="button"
+            onClick={() => setCustomerType('b2b')}
+            className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              customerType === 'b2b'
+                ? 'border-brand-500 bg-brand-50 text-brand-700'
+                : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Unternehmen (USt-ID)
+          </button>
+        </div>
+      </div>
+
+      {/* B2B fields */}
+      {customerType === 'b2b' && (
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Firmenname</label>
+            <input
+              type="text"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="z.B. Müller GmbH"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">USt-ID (VAT ID)</label>
+            <input
+              type="text"
+              value={vatId}
+              onChange={(e) => setVatId(e.target.value.toUpperCase())}
+              placeholder="z.B. DE123456789"
+              className="input font-mono"
+              maxLength={14}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Mit gültiger EU-USt-ID greift das <strong>Reverse-Charge-Verfahren</strong> →
+              0% MwSt auf der Rechnung. Wird von Stripe gegen die EU-VIES-Datenbank validiert.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">Rechnungsadresse</label>
-        <AddressElement options={{ mode: 'billing' }} />
-        <p className="mt-1 text-xs text-slate-500">
-          Wird für VAT-Berechnung gebraucht (Stripe Tax). Wird nicht weitergegeben.
-        </p>
+        <AddressElement
+          options={{
+            mode: 'billing',
+            display: customerType === 'b2b' ? { name: 'organization' } : { name: 'full' },
+          }}
+        />
       </div>
 
       <div>
@@ -168,7 +249,7 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
       </button>
 
       <p className="text-xs text-slate-500">
-        Im Test-Modus kannst du die Stripe-Test-Karte <code>4242 4242 4242 4242</code>
+        Im Test-Modus kannst du die Stripe-Test-Karte <code>4242 4242 4242 4242</code>{' '}
         nutzen — beliebiges Datum in der Zukunft + beliebige CVC.
       </p>
     </form>
