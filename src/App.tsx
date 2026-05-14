@@ -9,6 +9,7 @@ import { Onboarding } from './pages/Onboarding'
 import { PricingPlans } from './pages/PricingPlans'
 import { CustomerDetail } from './pages/CustomerDetail'
 import { Integrations } from './pages/Integrations'
+import { CustomerPreview } from './pages/CustomerPreview'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -74,6 +75,14 @@ export default function App() {
         element={
           <RequireAuth>
             <CustomerDetail />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/customers/:id/view"
+        element={
+          <RequireAuth>
+            <CustomerPreview />
           </RequireAuth>
         }
       />

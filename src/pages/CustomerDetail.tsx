@@ -76,7 +76,7 @@ export function CustomerDetail() {
                   <h1 className="text-2xl font-semibold">{customer.name}</h1>
                   <p className="mt-1 text-sm text-slate-500">{customer.contact_email}</p>
                 </div>
-                <div>
+                <div className="flex flex-col items-end gap-2">
                   {customer.has_payment_method ? (
                     <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
                       ✓ Zahlungsmethode hinterlegt
@@ -86,6 +86,12 @@ export function CustomerDetail() {
                       Pending Onboarding
                     </span>
                   )}
+                  <Link
+                    to={`/admin/customers/${customer.id}/view`}
+                    className="btn-ghost text-xs"
+                  >
+                    👁 Als Customer ansehen →
+                  </Link>
                 </div>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2 text-xs">

@@ -208,3 +208,12 @@ export async function adminAssignPricing(input: AssignPricingInput) {
     metered_item_id: string | null
   }
 }
+
+// ─── customer-billing-portal ────────────────────────────────────
+
+export async function getCustomerBillingPortalUrl() {
+  const { data, error } = await supabase.functions.invoke('customer-billing-portal', { body: {} })
+  if (error) throw new Error(error.message)
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return (data as { ok: true; url: string }).url
+}
