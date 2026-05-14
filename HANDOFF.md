@@ -4,11 +4,11 @@
 
 ## Last update
 
-**2026-05-13** — Marcus (Session-Close: Step 1+2 Code done + zu GitHub gepusht, Token-Bug gefixed, awaiting Netlify + SQL-Exec von Aleksa)
+**2026-05-13** — Marcus (DB-Migration jetzt LIVE über Management API, awaiting Aleksa: Netlify + Stripe Test Keys)
 
 ## Current state
 
-🟡 **Step 1 + 2 Code complete, awaiting Aleksa: SQL-Migration ausführen + Netlify connecten**
+🟡 **Step 1 Code + Step 2 DB komplett. Awaiting Aleksa: Netlify-Connect + Stripe Test-Keys**
 
 **Nicht versuchen:** lokales `npm run dev` oder `preview_start`. Auf Aleksas MacBook (User `aleksaspalevic`) ist Node NICHT installiert — Frontend wird ausschließlich über Netlify gebaut + getestet. Siehe Marcus knowledge.md "Node-loses Development auf Aleksas MacBook".
 
@@ -37,24 +37,31 @@
 - ✅ Code geschrieben + zu GitHub gepusht (3 Commits auf main)
 - Build wird auf Netlify passieren, nicht lokal
 
-### Step 2 — SQL written, awaiting Aleksa execution
-- ✅ `supabase/migrations/001_initial_schema.sql` — 7 Tabellen + RLS-Policies + handle_new_user Trigger + Helper-Functions
-- ⏳ Aleksa: im Supabase Dashboard SQL Editor paste + Run
-- ⏳ Aleksa: nach erstem Magic-Link-Login das eigene Profile zu admin promoten:
-  ```sql
-  update profiles set role = 'admin' where id = (select id from auth.users where email = 'info@aleksa.ai');
-  ```
+### Step 2 ✅ DB done (2026-05-13)
+- Migration ausgeführt via Supabase Management API (POST /v1/projects/{ref}/database/query)
+- 7 Tabellen sichtbar mit RLS: `customers`, `profiles`, `voice_agents`, `pricing_plans`, `customer_subscriptions`, `calls`, `customer_invitations`
+- `handle_new_user` Trigger live (auto-creates profiles row on signup, role='customer_owner')
+- `set_updated_at` Trigger auf 5 Tabellen
+- Helper-Functions: `current_user_role()`, `current_user_customer_id()`
+- Aleksa hat Personal Access Token generiert (gespeichert in `.env.local` als `SUPABASE_PERSONAL_ACCESS_TOKEN`, scoped nur auf dieses Projekt) — damit kann Marcus ab jetzt alles in Supabase selbst machen, keine Aleksa-Klicks mehr nötig
 
-## What's next (Aleksa pending)
+### Post-Login: Aleksa zu admin promoten (1 SQL-Aufruf, macht Marcus selbst sobald Aleksa erst-eingeloggt ist)
+Marcus führt aus sobald `auth.users` einen Eintrag für `info@aleksa.ai` hat:
+```sql
+update profiles set role = 'admin' where id = (select id from auth.users where email = 'info@aleksa.ai');
+```
 
-1. **SQL-Migration ausführen:** Supabase Dashboard `puimwizupgkdvxpanlhy` → SQL Editor → paste content of `supabase/migrations/001_initial_schema.sql` (RAW von GitHub holen) → Run
-2. **Netlify connecten:**
+## What's next (Aleksa pending, parallel)
+
+1. **Netlify connecten** (5 Klicks):
    - Add new site → Import from GitHub → `aleksaai/aleksa-ai-app`
    - Build: `npm run build` / Publish: `dist`
-   - Env vars: `NODE_VERSION=22`, `VITE_SUPABASE_URL=https://puimwizupgkdvxpanlhy.supabase.co`, `VITE_SUPABASE_ANON_KEY=<aus Supabase Dashboard → Settings → API>`
-3. **Marcus in nächster Session:** öffnet Netlify-URL im Browser via Chrome-MCP-Tool → verifiziert Login-Page rendert
-4. **Aleksa:** Magic-Link-Test mit `info@aleksa.ai` auf der Netlify-URL → Profile zu admin promoten via SQL → Login bestätigt
-5. Wenn alles ✅ → Step 3 + 4 starten (Stripe-Setup-Verification + Customer-CRUD im Admin)
+   - Env vars: `NODE_VERSION=22`, `VITE_SUPABASE_URL=https://puimwizupgkdvxpanlhy.supabase.co`, `VITE_SUPABASE_ANON_KEY=<anon key>`
+   - URL an Marcus melden
+2. **Stripe Test-Keys** holen (Stripe Account 1 → Test-Mode toggle → API keys → `sk_test_...` + `pk_test_...`) und an Marcus
+3. **Marcus parallel:** deployt Edge Functions (`accept-invitation`, `admin-create-customer`, `setup-intent`, `webhook-stripe`, später `webhook-elevenlabs` + `cron-stripe-usage`)
+4. **Magic-Link-Test:** sobald Netlify-URL live → Marcus öffnet via Chrome-Tool → Aleksa testet Login
+5. Step 3-10: Stripe-Webhook, Customer-CRUD, Pricing-Plans, Voice-Agent-Zuordnung, ElevenLabs-Webhook, Usage-Cron, VV-Cars-Migration
 
 ## Decisions made
 
@@ -70,21 +77,12 @@
 - **Customer-Selfservice am Voice Agent:** kommt in V1
 - **Subdomain pro Customer:** kommt in V2
 
-## Decisions made
-
-- **Naming:** `aleksa-ai-app` (Repo) + `app.aleksa.ai` (Subdomain). Brand bleibt "AleksaAI"
-- **Supabase:** separate Projekt unter `aleksa@spalevic-consulting.de` Account, NICHT claude-team's Supabase. Sauberer Trust-Boundary für Customer-Daten
-- **Stripe Tax:** AN (0.5% extra pro Tx, spart EU-B2B-Reverse-Charge-Compliance-Aufwand)
-- **Stripe Pricing-Modell:** Tiered Metered Billing (eine Subscription mit flat + metered Components)
-- **Customer-Selfservice am Voice Agent:** kommt in V1, NICHT im MVP
-- **Subdomain pro Customer:** kommt in V2, NICHT im MVP
-
 ## Open questions
 
 — keine offenen Fragen aktuell. Alle Discovery-Punkte sind in SPEC.md geklärt.
 
 ## Risks / WIP / Blockers
 
-- Aleksa muss noch Stripe Tax aktivieren (Step 3 im Build-Plan blockiert sonst)
-- Aleksa muss GitHub-Repo `aleksaai/aleksa-ai-app` anlegen vor Push
-- ChatDash-Migrations-Cutover (Step 10) braucht ein ruhiges Wartungsfenster — VV-Cars/Vierroth muss informiert werden bevor wir den ElevenLabs-Webhook umschalten
+- **Aleksa-Block für Frontend-Test:** Netlify-Connect ist Voraussetzung für Magic-Link-Test. Ohne Netlify keine sichtbare App
+- **Aleksa-Block für Stripe-Functions:** Stripe Test-Keys nötig bevor `webhook-stripe`, `setup-intent`, `admin-create-customer` deployed werden können (alle rufen Stripe API)
+- **ChatDash-Migration (Step 10):** braucht ruhiges Wartungsfenster — VV-Cars/Vierroth muss informiert werden bevor wir den ElevenLabs-Webhook umschalten
