@@ -227,6 +227,13 @@ export type UpdateBusinessInput = {
 
 // ─── admin-get-agent-config ─────────────────────────────────────
 
+export type KBEntry = {
+  id: string
+  name: string
+  type: 'text' | 'file' | 'url'
+  usage_mode?: 'auto' | 'prompt'
+}
+
 export type AgentConfig = {
   ok: true
   agent_id: string
@@ -239,6 +246,8 @@ export type AgentConfig = {
   tts_model: string | null
   stability: number | null
   similarity_boost: number | null
+  knowledge_base: KBEntry[]
+  rag_enabled: boolean
 }
 
 export async function adminGetAgentConfig(voice_agent_id: string): Promise<AgentConfig> {
@@ -301,6 +310,62 @@ export async function adminListVoices(integration_id: string): Promise<Voice[]> 
   if (error) throw new Error(error.message)
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data.voices
+}
+
+// ─── Knowledge Base ─────────────────────────────────────────────
+
+export type KBDoc = {
+  id: string
+  name: string
+  type: string
+  access_level?: string | null
+}
+
+export async function adminListKbDocs(integration_id: string): Promise<KBDoc[]> {
+  const { data, error } = await supabase.functions.invoke<{ ok: true; docs: KBDoc[] }>('admin-list-kb-docs', {
+    body: { integration_id },
+  })
+  if (error) throw new Error(error.message)
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data.docs
+}
+
+export async function adminCreateKbDoc(input: { integration_id: string; name: string; text: string }) {
+  const { data, error } = await supabase.functions.invoke<{ ok: true; doc: KBDoc }>('admin-create-kb-doc', {
+    body: input,
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data.doc
+}
+
+export async function adminUpdateAgentKb(input: {
+  voice_agent_id: string
+  knowledge_base: KBEntry[]
+  rag_enabled?: boolean
+}) {
+  const { data, error } = await supabase.functions.invoke('admin-update-agent-kb', { body: input })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data
 }
 
 export async function updateCustomerBusiness(input: UpdateBusinessInput) {

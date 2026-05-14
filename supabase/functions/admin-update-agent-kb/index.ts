@@ -1,6 +1,6 @@
-// admin-get-agent-config Edge Function
-// Fetches the live ElevenLabs configuration for a voice_agent (prompt, first_message,
-// voice_id, llm, etc.) using the stored integration API key (server-side).
+// admin-update-agent-kb Edge Function
+// Patches an ElevenLabs agent's knowledge_base array + rag.enabled flag.
+// Replaces the full list (not append) — frontend computes the desired final state.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -16,8 +16,14 @@ function json(data: unknown, status = 200) {
 }
 
 function elevenlabsBase(_region: string | null): string {
-  // Switch to api.eu.residency.elevenlabs.io once Enterprise upgrade happens.
   return 'https://api.elevenlabs.io'
+}
+
+type KBEntry = {
+  id: string
+  name: string
+  type: 'text' | 'file' | 'url'
+  usage_mode?: 'auto' | 'prompt'
 }
 
 Deno.serve(async (req) => {
@@ -45,50 +51,57 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const voice_agent_id = (body.voice_agent_id ?? '').toString().trim()
+    const kb_entries = body.knowledge_base as KBEntry[] | undefined
+    const rag_enabled = body.rag_enabled as boolean | undefined
+
     if (!voice_agent_id) return json({ error: 'voice_agent_id_required' }, 400)
+    if (!Array.isArray(kb_entries)) return json({ error: 'knowledge_base_must_be_array' }, 400)
 
     const { data: agent } = await supabaseAdmin
       .from('voice_agents')
-      .select('*, integrations(api_key, platform, region)')
+      .select('platform_agent_id, integrations(api_key, platform, region)')
       .eq('id', voice_agent_id)
       .maybeSingle()
     if (!agent) return json({ error: 'agent_not_found' }, 404)
 
     const integration = (agent as any).integrations
     if (!integration) return json({ error: 'no_integration' }, 400)
-    if (integration.platform !== 'elevenlabs') {
-      return json({ error: 'platform_not_yet_supported', platform: integration.platform }, 501)
+    if (integration.platform !== 'elevenlabs') return json({ error: 'platform_not_yet_supported' }, 501)
+
+    // Normalize entries: ensure usage_mode set
+    const normalized = kb_entries.map((e) => ({
+      id: e.id,
+      name: e.name,
+      type: e.type ?? 'text',
+      usage_mode: e.usage_mode ?? 'auto',
+    }))
+
+    // Build patch — replaces the whole prompt.knowledge_base + sets rag.enabled
+    const promptPatch: any = { knowledge_base: normalized }
+    if (rag_enabled !== undefined) {
+      // ElevenLabs RAG config: use default embedding for now
+      promptPatch.rag = rag_enabled
+        ? { enabled: true, embedding_model: 'e5_mistral_7b_instruct', max_documents_length: 50000, max_vector_distance: 0.6, max_retrieved_rag_chunks_count: 20 }
+        : { enabled: false }
     }
 
     const base = elevenlabsBase(integration.region)
     const res = await fetch(`${base}/v1/convai/agents/${agent.platform_agent_id}`, {
-      headers: { 'xi-api-key': integration.api_key },
+      method: 'PATCH',
+      headers: {
+        'xi-api-key': integration.api_key,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        conversation_config: {
+          agent: { prompt: promptPatch },
+        },
+      }),
     })
     if (!res.ok) {
-      return json({ error: 'elevenlabs_fetch_failed', detail: await res.text() }, 500)
+      return json({ error: 'elevenlabs_patch_failed', detail: await res.text() }, res.status)
     }
-    const cfg = await res.json()
-
-    // Return the bits we expose in the UI
-    const agentCfg = cfg.conversation_config?.agent ?? {}
-    const ttsCfg = cfg.conversation_config?.tts ?? {}
-    const promptCfg = agentCfg.prompt ?? {}
-    return json({
-      ok: true,
-      agent_id: agent.platform_agent_id,
-      name: cfg.name,
-      prompt: promptCfg.prompt ?? '',
-      llm: promptCfg.llm ?? null,
-      first_message: agentCfg.first_message ?? '',
-      language: agentCfg.language ?? null,
-      voice_id: ttsCfg.voice_id ?? null,
-      tts_model: ttsCfg.model_id ?? null,
-      stability: ttsCfg.stability ?? null,
-      similarity_boost: ttsCfg.similarity_boost ?? null,
-      // Knowledge Base
-      knowledge_base: promptCfg.knowledge_base ?? [],
-      rag_enabled: promptCfg.rag?.enabled ?? false,
-    })
+    return json({ ok: true, knowledge_base: normalized, rag_enabled: rag_enabled ?? null })
   } catch (e) {
     return json({ error: 'unexpected', detail: e instanceof Error ? e.message : String(e) }, 500)
   }

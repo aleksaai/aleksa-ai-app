@@ -8,8 +8,13 @@ import {
   adminGetAgentConfig,
   adminUpdateAgentConfig,
   adminListVoices,
+  adminListKbDocs,
+  adminCreateKbDoc,
+  adminUpdateAgentKb,
   type AgentConfig,
   type Voice,
+  type KBDoc,
+  type KBEntry,
 } from '../lib/api'
 
 type AgentRow = VoiceAgent & {
@@ -17,7 +22,7 @@ type AgentRow = VoiceAgent & {
   integrations: Pick<Integration, 'id' | 'name' | 'platform' | 'region'> | null
 }
 
-type Tab = 'overview' | 'prompt' | 'voice'
+type Tab = 'overview' | 'prompt' | 'voice' | 'kb'
 
 export function AgentDetail() {
   const { id } = useParams<{ id: string }>()
@@ -35,6 +40,17 @@ export function AgentDetail() {
   // Voice picker
   const [voices, setVoices] = useState<Voice[]>([])
   const [voicesLoading, setVoicesLoading] = useState(false)
+
+  // Knowledge Base
+  const [workspaceKb, setWorkspaceKb] = useState<KBDoc[]>([])
+  const [workspaceKbLoading, setWorkspaceKbLoading] = useState(false)
+  const [assignedKb, setAssignedKb] = useState<KBEntry[]>([])
+  const [ragEnabled, setRagEnabled] = useState(false)
+  const [kbModalOpen, setKbModalOpen] = useState(false)
+  const [newKbName, setNewKbName] = useState('')
+  const [newKbText, setNewKbText] = useState('')
+  const [kbCreating, setKbCreating] = useState(false)
+  const [kbError, setKbError] = useState('')
 
   // Save state
   const [saving, setSaving] = useState(false)
@@ -59,6 +75,8 @@ export function AgentDetail() {
           setPrompt(cfg.prompt)
           setFirstMessage(cfg.first_message)
           setSelectedVoice(cfg.voice_id ?? '')
+          setAssignedKb(cfg.knowledge_base ?? [])
+          setRagEnabled(cfg.rag_enabled ?? false)
         } catch (e) {
           console.error('Failed to load agent config:', e)
         }
@@ -76,31 +94,104 @@ export function AgentDetail() {
       .finally(() => setVoicesLoading(false))
   }, [tab, agent, voices.length])
 
+  useEffect(() => {
+    if (tab !== 'kb' || !agent?.integrations?.id || workspaceKb.length > 0) return
+    setWorkspaceKbLoading(true)
+    adminListKbDocs(agent.integrations.id)
+      .then((docs) => setWorkspaceKb(docs))
+      .catch((e) => console.error('list KB failed:', e))
+      .finally(() => setWorkspaceKbLoading(false))
+  }, [tab, agent, workspaceKb.length])
+
+  const refreshWorkspaceKb = async () => {
+    if (!agent?.integrations?.id) return
+    setWorkspaceKbLoading(true)
+    try {
+      const docs = await adminListKbDocs(agent.integrations.id)
+      setWorkspaceKb(docs)
+    } finally {
+      setWorkspaceKbLoading(false)
+    }
+  }
+
+  const handleAddKbToAgent = (doc: KBDoc) => {
+    if (assignedKb.find((e) => e.id === doc.id)) return
+    setAssignedKb([
+      ...assignedKb,
+      { id: doc.id, name: doc.name, type: (doc.type as KBEntry['type']) ?? 'text', usage_mode: 'auto' },
+    ])
+  }
+
+  const handleRemoveKbFromAgent = (docId: string) => {
+    setAssignedKb(assignedKb.filter((e) => e.id !== docId))
+  }
+
+  const handleCreateNewKb = async () => {
+    if (!agent?.integrations?.id || !newKbName.trim() || !newKbText.trim()) return
+    setKbCreating(true)
+    setKbError('')
+    try {
+      const doc = await adminCreateKbDoc({
+        integration_id: agent.integrations.id,
+        name: newKbName.trim(),
+        text: newKbText,
+      })
+      // Add to workspace list + auto-assign to agent
+      setWorkspaceKb([doc, ...workspaceKb])
+      setAssignedKb([
+        ...assignedKb,
+        { id: doc.id, name: doc.name, type: 'text', usage_mode: 'auto' },
+      ])
+      setKbModalOpen(false)
+      setNewKbName('')
+      setNewKbText('')
+    } catch (e) {
+      setKbError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setKbCreating(false)
+    }
+  }
+
+  const kbChanged =
+    config !== null &&
+    (JSON.stringify(assignedKb.map((e) => e.id).sort()) !==
+      JSON.stringify((config.knowledge_base ?? []).map((e) => e.id).sort()) ||
+      ragEnabled !== config.rag_enabled)
+
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
     if (!id || !config) return
     setSaving(true)
     setSaveError('')
 
-    // Build diff: only send changed fields
-    const patch: { voice_agent_id: string; prompt?: string; first_message?: string; voice_id?: string } = {
-      voice_agent_id: id,
-    }
-    if (prompt !== config.prompt) patch.prompt = prompt
-    if (firstMessage !== config.first_message) patch.first_message = firstMessage
-    if (selectedVoice && selectedVoice !== config.voice_id) patch.voice_id = selectedVoice
-
-    if (Object.keys(patch).length === 1) {
-      setSaving(false)
-      return
-    }
-
     try {
-      await adminUpdateAgentConfig(patch)
+      // 1. Patch prompt/first_message/voice if changed
+      const patch: { voice_agent_id: string; prompt?: string; first_message?: string; voice_id?: string } = {
+        voice_agent_id: id,
+      }
+      if (prompt !== config.prompt) patch.prompt = prompt
+      if (firstMessage !== config.first_message) patch.first_message = firstMessage
+      if (selectedVoice && selectedVoice !== config.voice_id) patch.voice_id = selectedVoice
+
+      if (Object.keys(patch).length > 1) {
+        await adminUpdateAgentConfig(patch)
+      }
+
+      // 2. Patch knowledge_base if changed
+      if (kbChanged) {
+        await adminUpdateAgentKb({
+          voice_agent_id: id,
+          knowledge_base: assignedKb,
+          rag_enabled: ragEnabled,
+        })
+      }
+
       setSavedAt(Date.now())
       // Refresh config to reflect new state
       const cfg = await adminGetAgentConfig(id)
       setConfig(cfg)
+      setAssignedKb(cfg.knowledge_base ?? [])
+      setRagEnabled(cfg.rag_enabled ?? false)
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -112,7 +203,8 @@ export function AgentDetail() {
     config !== null &&
     (prompt !== config.prompt ||
       firstMessage !== config.first_message ||
-      (selectedVoice !== '' && selectedVoice !== config.voice_id))
+      (selectedVoice !== '' && selectedVoice !== config.voice_id) ||
+      kbChanged)
 
   return (
     <div className="min-h-screen">
@@ -173,7 +265,7 @@ export function AgentDetail() {
             </section>
 
             <div className="mb-4 flex gap-1 border-b border-slate-200">
-              {(['overview', 'prompt', 'voice'] as Tab[]).map((t) => (
+              {(['overview', 'prompt', 'voice', 'kb'] as Tab[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -186,6 +278,7 @@ export function AgentDetail() {
                   {t === 'overview' && 'Übersicht'}
                   {t === 'prompt' && 'Prompt & Begrüßung'}
                   {t === 'voice' && 'Stimme'}
+                  {t === 'kb' && 'Wissensdatenbank'}
                 </button>
               ))}
             </div>
@@ -293,6 +386,120 @@ export function AgentDetail() {
                 </motion.div>
               )}
 
+              {tab === 'kb' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                  {/* Header */}
+                  <div className="card">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold">Wissensdatenbank-Dokumente</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Dokumente die dem Agent für RAG-basierte Antworten zur Verfügung stehen.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setKbModalOpen(true)}
+                        className="btn-primary text-sm"
+                      >
+                        + Neuer Doc
+                      </button>
+                    </div>
+
+                    <label className="mt-4 flex cursor-pointer items-center justify-between rounded-lg bg-slate-50 p-3">
+                      <div>
+                        <p className="text-sm font-medium">RAG aktiviert</p>
+                        <p className="text-xs text-slate-500">
+                          Wenn an: Agent durchsucht KB-Docs während des Gesprächs (etwas mehr Latenz, dafür präzisere Antworten)
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={ragEnabled}
+                        onChange={(e) => setRagEnabled(e.target.checked)}
+                        className="h-5 w-5"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Assigned to this agent */}
+                  <div className="card">
+                    <h4 className="mb-3 text-sm font-medium">Diesem Agent zugewiesen ({assignedKb.length})</h4>
+                    {assignedKb.length === 0 ? (
+                      <p className="text-xs text-slate-500">
+                        Keine Docs zugewiesen. Unten aus deinem Workspace adden oder neu erstellen.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {assignedKb.map((e) => (
+                          <div
+                            key={e.id}
+                            className="flex items-center justify-between rounded-lg border border-slate-200 p-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">{e.name}</p>
+                              <p className="font-mono text-xs text-slate-500">{e.id}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveKbFromAgent(e.id)}
+                              className="btn-ghost text-xs text-red-600"
+                            >
+                              Entfernen
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Workspace KB list */}
+                  <div className="card">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h4 className="text-sm font-medium">Im Workspace verfügbar</h4>
+                      <button type="button" onClick={refreshWorkspaceKb} className="btn-ghost text-xs">
+                        🔄 Neu laden
+                      </button>
+                    </div>
+                    {workspaceKbLoading ? (
+                      <p className="text-xs text-slate-500">Lade ElevenLabs Workspace-KB…</p>
+                    ) : workspaceKb.length === 0 ? (
+                      <p className="text-xs text-slate-500">Noch keine Docs im Workspace. Klick oben auf "+ Neuer Doc".</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {workspaceKb.map((d) => {
+                          const alreadyAssigned = assignedKb.some((e) => e.id === d.id)
+                          return (
+                            <div
+                              key={d.id}
+                              className="flex items-center justify-between rounded-lg border border-slate-200 p-2"
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{d.name}</p>
+                                <p className="font-mono text-xs text-slate-500">
+                                  {d.id} · {d.type}
+                                </p>
+                              </div>
+                              {alreadyAssigned ? (
+                                <span className="text-xs text-emerald-600">✓ zugewiesen</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddKbToAgent(d)}
+                                  className="btn-ghost text-xs"
+                                >
+                                  + Zuweisen
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
               {saveError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   {saveError}
@@ -305,6 +512,56 @@ export function AgentDetail() {
                 </button>
               </div>
             </form>
+
+            {/* New KB Doc Modal */}
+            {kbModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={() => setKbModalOpen(false)}>
+                <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                  <h2 className="text-xl font-semibold">Neuen KB-Doc erstellen</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Wird in deinem ElevenLabs Workspace gespeichert + direkt diesem Agent zugewiesen.
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">Name</label>
+                      <input
+                        type="text"
+                        value={newKbName}
+                        onChange={(e) => setNewKbName(e.target.value)}
+                        placeholder="z.B. VV-Cars Preisliste 2026"
+                        className="input"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">Inhalt (Text)</label>
+                      <textarea
+                        value={newKbText}
+                        onChange={(e) => setNewKbText(e.target.value)}
+                        rows={15}
+                        className="input font-mono text-xs"
+                        placeholder="Hier den vollständigen Text einfügen — wird vom Agent über RAG durchsucht."
+                      />
+                    </div>
+                    {kbError && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{kbError}</div>
+                    )}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setKbModalOpen(false)} className="btn-ghost flex-1" disabled={kbCreating}>
+                        Abbrechen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCreateNewKb}
+                        disabled={kbCreating || !newKbName.trim() || !newKbText.trim()}
+                        className="btn-primary flex-1"
+                      >
+                        {kbCreating ? 'Erstelle…' : 'Erstellen + Zuweisen'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>

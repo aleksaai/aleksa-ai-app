@@ -1,6 +1,5 @@
-// admin-get-agent-config Edge Function
-// Fetches the live ElevenLabs configuration for a voice_agent (prompt, first_message,
-// voice_id, llm, etc.) using the stored integration API key (server-side).
+// admin-list-kb-docs Edge Function
+// Lists all workspace-level Knowledge Base documents from ElevenLabs for a given integration.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -16,7 +15,6 @@ function json(data: unknown, status = 200) {
 }
 
 function elevenlabsBase(_region: string | null): string {
-  // Switch to api.eu.residency.elevenlabs.io once Enterprise upgrade happens.
   return 'https://api.elevenlabs.io'
 }
 
@@ -44,51 +42,29 @@ Deno.serve(async (req) => {
     if (profile?.role !== 'admin') return json({ error: 'admin_only' }, 403)
 
     const body = await req.json().catch(() => ({}))
-    const voice_agent_id = (body.voice_agent_id ?? '').toString().trim()
-    if (!voice_agent_id) return json({ error: 'voice_agent_id_required' }, 400)
+    const integration_id = (body.integration_id ?? '').toString().trim()
+    if (!integration_id) return json({ error: 'integration_id_required' }, 400)
 
-    const { data: agent } = await supabaseAdmin
-      .from('voice_agents')
-      .select('*, integrations(api_key, platform, region)')
-      .eq('id', voice_agent_id)
-      .maybeSingle()
-    if (!agent) return json({ error: 'agent_not_found' }, 404)
-
-    const integration = (agent as any).integrations
-    if (!integration) return json({ error: 'no_integration' }, 400)
-    if (integration.platform !== 'elevenlabs') {
-      return json({ error: 'platform_not_yet_supported', platform: integration.platform }, 501)
-    }
+    const { data: integration } = await supabaseAdmin
+      .from('integrations').select('api_key, platform, region').eq('id', integration_id).maybeSingle()
+    if (!integration) return json({ error: 'integration_not_found' }, 404)
+    if (integration.platform !== 'elevenlabs') return json({ error: 'platform_not_yet_supported' }, 501)
 
     const base = elevenlabsBase(integration.region)
-    const res = await fetch(`${base}/v1/convai/agents/${agent.platform_agent_id}`, {
+    const res = await fetch(`${base}/v1/convai/knowledge-base?page_size=100`, {
       headers: { 'xi-api-key': integration.api_key },
     })
     if (!res.ok) {
-      return json({ error: 'elevenlabs_fetch_failed', detail: await res.text() }, 500)
+      return json({ error: 'elevenlabs_kb_list_failed', detail: await res.text() }, 500)
     }
-    const cfg = await res.json()
-
-    // Return the bits we expose in the UI
-    const agentCfg = cfg.conversation_config?.agent ?? {}
-    const ttsCfg = cfg.conversation_config?.tts ?? {}
-    const promptCfg = agentCfg.prompt ?? {}
-    return json({
-      ok: true,
-      agent_id: agent.platform_agent_id,
-      name: cfg.name,
-      prompt: promptCfg.prompt ?? '',
-      llm: promptCfg.llm ?? null,
-      first_message: agentCfg.first_message ?? '',
-      language: agentCfg.language ?? null,
-      voice_id: ttsCfg.voice_id ?? null,
-      tts_model: ttsCfg.model_id ?? null,
-      stability: ttsCfg.stability ?? null,
-      similarity_boost: ttsCfg.similarity_boost ?? null,
-      // Knowledge Base
-      knowledge_base: promptCfg.knowledge_base ?? [],
-      rag_enabled: promptCfg.rag?.enabled ?? false,
-    })
+    const respBody = await res.json()
+    const docs = (respBody.documents ?? []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      access_level: d.access_info?.role ?? null,
+    }))
+    return json({ ok: true, docs })
   } catch (e) {
     return json({ error: 'unexpected', detail: e instanceof Error ? e.message : String(e) }, 500)
   }
