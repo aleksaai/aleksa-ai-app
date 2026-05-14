@@ -6,6 +6,7 @@ import { Admin } from './pages/Admin'
 import { Dashboard } from './pages/Dashboard'
 import { Invite } from './pages/Invite'
 import { Onboarding } from './pages/Onboarding'
+import { PricingPlans } from './pages/PricingPlans'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -47,6 +48,14 @@ export default function App() {
         element={
           <RequireAuth>
             <Admin />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/pricing-plans"
+        element={
+          <RequireAuth>
+            <PricingPlans />
           </RequireAuth>
         }
       />

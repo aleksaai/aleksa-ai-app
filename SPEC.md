@@ -29,15 +29,66 @@ Whitelabel-Plattform für Aleksas ElevenLabs-Voice-Agent-Reseller-Business. Erse
 
 **MVP Customer-View:** Paywall + nach Bezahlung leeres Dashboard "Hi, du bist live, Rechnungen kommen monatlich" + Link zu Stripe Customer Portal. Kein Selfservice am Voice Agent.
 
-### V1 — "Customer-Selfservice"
-7. Customer-Dashboard mit Calls-Log (Datum, Dauer, Kosten)
-8. Customer kann pro Voice Agent System-Prompt + First Message + Voice ändern → Frontend ruft `elevenlabs-bridge → patch_agent` (existiert) → Änderungen sind sofort live
-9. Customer kann Knowledge-Base-Docs hochladen → wird via `elevenlabs-bridge → create_kb_from_text` an den Agent gepatcht
+### V1.5 — "Vision-Sidebar im Admin" (Aleksas Vision 2026-05-14)
 
-### V2 — "Whitelabel-Polish"
-10. Pro Customer: eigene Subdomain (`vv-cars.app.aleksa.ai` oder Custom-Domain)
-11. Custom Logo + Custom Color pro Customer
-12. Email-Templates per Customer brandbar (Optional)
+Admin-Panel mit Sidebar + 4 Top-Level-Tabs:
+
+**Tab 1: Kunden**
+- Liste (haben wir im MVP)
+- Klick auf Kunde → Detail-Page mit Sub-Tabs:
+  - **Übersicht** — Name, Dashboard-Sprache (DE/EN/HU), Stripe-Status, Branding
+  - **Zugewiesene Agenten** — Liste der Agents die diesem Customer zugewiesen sind (aus Tab 2). Add/Remove. Pro Agent: aktive Subscription anzeigen
+  - **Kundenzugriff** — Toggles pro Feature, was der Customer in seinem Dashboard sehen darf:
+    - Gespräche (Calls-Log)
+    - Transkripte
+    - Audiodateien
+    - Analysen (Anzahl Calls, Dauer, Kosten)
+    - Wissensdatenbank-Editor (Read/Write)
+    - Agenten-Konfiguration-Editor (System Prompt, First Message, LLM-Modell, Voice)
+
+**Tab 2: Agenten**
+- Liste eigener ElevenLabs + RetellAI Agents
+- "Neuer Agent" → Form mit Platform-Switcher (ElevenLabs / RetellAI), Agent-ID, Display-Name, Region (US/EU für RetellAI)
+- Klick auf Agent → Detail-Page mit Tabs:
+  - **Übersicht** — Agent-ID, API-Platform, Region, eventuelle Phone-Number-ID, Verknüpfter Customer (oder "frei")
+  - **Prompt + First Message** — Editor, schreibt direkt via ElevenLabs `patch_agent` / RetellAI `update_agent`
+  - **Tools** (V2) — Editor für Webhook-Tools
+  - **Webhook-Config** (RetellAI) — Post-Call-Webhook-URL anzeigen (read-only)
+
+**Tab 3: Abrechnungen** (Sub-Tabs)
+- **Produkte:** Liste aller Pricing-Pakete + "Neues Produkt" mit 3 Modi:
+  1. **Grundabo + Nutzung** — flat_amount + included_minutes + per_minute_overage + currency + interval (month/year)
+  2. **Nur Nutzungsbasiert** — per_minute + currency + interval (default: month)
+  3. **Einmalig** — one_time_amount + currency
+- **Abos:** Liste aller aktiven Subscriptions + "Neues Abo" mit Form:
+  - Kunde wählen (dropdown)
+  - Agent wählen (dropdown, gefiltert auf Customer-zugewiesene Agents)
+  - Startdatum (default: heute)
+  - Produkt wählen (dropdown)
+  - → Erstellt Stripe-Subscription mit allen passenden Stripe Prices
+
+**Tab 4: Einstellungen** — Account, API-Tokens, Resend-Verifikation, Webhook-URLs als Reference
+
+### V2 — "Customer-Selfservice + Live-Sync"
+
+**Customer-Dashboard** (was der eingeloggte Customer sieht):
+- Beim Login: Liste der ihm zugewiesenen Agenten
+- Klick auf Agent → Sidebar mit Items (gefiltert basiert auf Kundenzugriff-Permissions vom Admin):
+  - **Analysen** — Total Calls, Total Minutes, durchschnittliche Dauer, Cost-pro-Periode
+  - **Gespräche** — Liste der Calls mit Transkript-Snippet + Audio-Player (fetched von ElevenLabs/RetellAI API)
+  - **Wissensdatenbank** — Editor: docs erstellen/editieren → wird an Agent über ElevenLabs `patch_agent` mit `knowledge_base` array gepatcht
+  - **Agentenkonfiguration** — Editor für System Prompt, First Message, Voice, LLM-Modell → live-sync zu ElevenLabs/RetellAI
+  - **Abo-Details**:
+    - Abrechnungszeitraum (z.B. 27. April – 27. Mai 2026)
+    - Aktuelle Gesamtkosten (live, basiert auf `calls.duration_secs * pricing_plan`)
+    - Gesamtnutzung (z.B. 27:30 Min)
+    - Kosten pro Minute (statisch aus Pricing-Plan)
+    - Button "Abo verwalten" → öffnet Stripe Customer Portal in neuem Tab
+
+**Whitelabel-Polish:**
+- Pro Customer: eigene Subdomain (`<slug>.app.aleksa.ai`) oder Custom-Domain (`portal.vv-cars.de` → CNAME)
+- Pro Customer: Logo + Primary-Color in `customers.branding` jsonb
+- Email-Templates per Customer brandbar (optional)
 
 ## 4. Daten-Modell (Supabase: `puimwizupgkdvxpanlhy`)
 

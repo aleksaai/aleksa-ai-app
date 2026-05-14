@@ -20,14 +20,19 @@ export type Profile = {
   updated_at: string
 }
 
+export type PricingPlanType = 'per_minute' | 'flat' | 'hybrid' | 'one_time'
+
+export type BillingInterval = 'month' | 'year' | 'one_time'
+
 export type PricingPlan = {
   id: string
   name: string
-  type: 'per_minute' | 'flat' | 'hybrid'
+  type: PricingPlanType
   flat_amount_cents: number | null
   included_minutes: number | null
   per_minute_overage_cents: number | null
   currency: string
+  billing_interval: BillingInterval
   stripe_product_id: string | null
   stripe_flat_price_id: string | null
   stripe_metered_price_id: string | null

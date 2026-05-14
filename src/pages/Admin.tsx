@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
@@ -29,7 +30,23 @@ export function Admin() {
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-semibold">AleksaAI Admin</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-lg font-semibold">AleksaAI Admin</h1>
+            <nav className="flex gap-1">
+              <Link
+                to="/admin"
+                className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900"
+              >
+                Kunden
+              </Link>
+              <Link
+                to="/admin/pricing-plans"
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Pricing-Pakete
+              </Link>
+            </nav>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-600">{user?.email}</span>
             <button onClick={signOut} className="btn-ghost text-sm">

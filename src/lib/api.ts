@@ -89,3 +89,54 @@ export async function getSetupIntent(): Promise<SetupIntentResult> {
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data
 }
+
+// ─── admin-create-pricing-plan ──────────────────────────────────
+
+export type PricingPlanInput =
+  | {
+      type: 'hybrid'
+      name: string
+      currency: string
+      billing_interval: 'month' | 'year'
+      flat_amount_cents: number
+      included_minutes: number
+      per_minute_overage_cents: number
+    }
+  | {
+      type: 'per_minute'
+      name: string
+      currency: string
+      billing_interval: 'month' | 'year'
+      per_minute_overage_cents: number
+    }
+  | {
+      type: 'one_time'
+      name: string
+      currency: string
+      flat_amount_cents: number
+    }
+
+export type CreatePricingPlanResult = {
+  ok: true
+  plan: {
+    id: string
+    name: string
+    type: string
+    [k: string]: unknown
+  }
+  stripe_product_id: string
+  stripe_flat_price_id: string | null
+  stripe_metered_price_id: string | null
+}
+
+export async function adminCreatePricingPlan(
+  input: PricingPlanInput
+): Promise<CreatePricingPlanResult> {
+  const { data, error } = await supabase.functions.invoke<CreatePricingPlanResult>(
+    'admin-create-pricing-plan',
+    { body: input }
+  )
+  if (error) throw new Error(error.message)
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data
+}
