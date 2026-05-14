@@ -1,0 +1,188 @@
+import { useState, type FormEvent } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { adminCreateCustomer, type CreateCustomerResult } from '../lib/api'
+
+type Props = {
+  open: boolean
+  onClose: () => void
+  onCreated: () => void
+}
+
+export function NewCustomerDialog({ open, onClose, onCreated }: Props) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<CreateCustomerResult | null>(null)
+  const [copiedInvite, setCopiedInvite] = useState(false)
+
+  const reset = () => {
+    setName('')
+    setEmail('')
+    setStatus('idle')
+    setError('')
+    setResult(null)
+    setCopiedInvite(false)
+  }
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setStatus('loading')
+    setError('')
+    try {
+      const r = await adminCreateCustomer({ name, contact_email: email })
+      setResult(r)
+      setStatus('success')
+      onCreated()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setStatus('error')
+    }
+  }
+
+  const handleClose = () => {
+    reset()
+    onClose()
+  }
+
+  const copyInviteLink = async () => {
+    if (!result?.invite_link) return
+    await navigator.clipboard.writeText(result.invite_link)
+    setCopiedInvite(true)
+    setTimeout(() => setCopiedInvite(false), 2000)
+  }
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-slate-900/50"
+            onClick={handleClose}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={handleClose}
+          >
+            <div
+              className="card w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {status !== 'success' ? (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">Neuer Customer</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Legt einen Stripe-Customer an und schickt eine Email-Einladung mit Login-Link.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="cust-name" className="mb-1 block text-sm font-medium text-slate-700">
+                      Firmenname / Anzeigename
+                    </label>
+                    <input
+                      id="cust-name"
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="z.B. VV-Cars Personenbeförderung"
+                      className="input"
+                      disabled={status === 'loading'}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="cust-email" className="mb-1 block text-sm font-medium text-slate-700">
+                      Kontakt-Email
+                    </label>
+                    <input
+                      id="cust-email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="info@vv-cars.de"
+                      className="input"
+                      disabled={status === 'loading'}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Diese Adresse bekommt die Einladungs-Mail.
+                    </p>
+                  </div>
+
+                  {status === 'error' && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleClose}
+                      className="btn-ghost flex-1"
+                      disabled={status === 'loading'}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-primary flex-1"
+                      disabled={status === 'loading' || !name || !email}
+                    >
+                      {status === 'loading' ? 'Lege an…' : 'Customer anlegen'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-emerald-700">Customer angelegt ✓</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      <strong>{name}</strong> wurde als Stripe-Customer angelegt.
+                      {result?.email_sent
+                        ? ' Die Einladungs-Mail wurde verschickt.'
+                        : ' ⚠️ Die Email konnte nicht versandt werden — teil den Link manuell.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      Invitation-Link
+                    </p>
+                    <p className="break-all font-mono text-xs text-slate-700">
+                      {result?.invite_link}
+                    </p>
+                    <button
+                      onClick={copyInviteLink}
+                      className="btn-ghost mt-2 text-xs"
+                    >
+                      {copiedInvite ? '✓ Kopiert' : 'Link kopieren'}
+                    </button>
+                  </div>
+
+                  <div className="text-xs text-slate-500">
+                    Stripe Customer-ID: <code>{result?.stripe_customer_id}</code>
+                  </div>
+
+                  <button onClick={handleClose} className="btn-primary w-full">
+                    Fertig
+                  </button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
