@@ -192,7 +192,7 @@ export function CustomerDetail() {
           <AssignPricingDialog
             open={!!assignAgent}
             voiceAgentId={assignAgent?.id ?? ''}
-            voiceAgentName={assignAgent?.display_name ?? assignAgent?.elevenlabs_agent_id ?? ''}
+            voiceAgentName={assignAgent?.display_name ?? assignAgent?.platform_agent_id ?? ''}
             onClose={() => setAssignAgent(null)}
             onAssigned={load}
           />
