@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Invite } from './pages/Invite'
 import { Onboarding } from './pages/Onboarding'
 import { PricingPlans } from './pages/PricingPlans'
+import { CustomerDetail } from './pages/CustomerDetail'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -56,6 +57,14 @@ export default function App() {
         element={
           <RequireAuth>
             <PricingPlans />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/customers/:id"
+        element={
+          <RequireAuth>
+            <CustomerDetail />
           </RequireAuth>
         }
       />

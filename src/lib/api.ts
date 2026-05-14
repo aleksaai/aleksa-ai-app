@@ -140,3 +140,39 @@ export async function adminCreatePricingPlan(
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data
 }
+
+// ─── admin-create-voice-agent ──────────────────────────────────
+
+export type CreateVoiceAgentInput = {
+  customer_id: string
+  elevenlabs_agent_id: string
+  display_name?: string
+  elevenlabs_phone_number_id?: string
+}
+
+export async function adminCreateVoiceAgent(input: CreateVoiceAgentInput) {
+  const { data, error } = await supabase.functions.invoke('admin-create-voice-agent', { body: input })
+  if (error) throw new Error(error.message)
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data as { ok: true; agent: { id: string } }
+}
+
+// ─── admin-assign-pricing ───────────────────────────────────────
+
+export type AssignPricingInput = {
+  voice_agent_id: string
+  pricing_plan_id: string
+}
+
+export async function adminAssignPricing(input: AssignPricingInput) {
+  const { data, error } = await supabase.functions.invoke('admin-assign-pricing', { body: input })
+  if (error) throw new Error(error.message)
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data as {
+    ok: true
+    customer_subscription: { id: string; status: string }
+    stripe_subscription_id: string
+    stripe_status: string
+    metered_item_id: string | null
+  }
+}

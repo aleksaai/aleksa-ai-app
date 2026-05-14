@@ -111,7 +111,11 @@ export function Admin() {
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
                 {customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50">
+                  <tr
+                    key={c.id}
+                    className="cursor-pointer hover:bg-slate-50"
+                    onClick={() => (window.location.href = `/admin/customers/${c.id}`)}
+                  >
                     <td className="px-4 py-3 text-sm font-medium text-slate-900">{c.name}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{c.contact_email}</td>
                     <td className="px-4 py-3 text-sm">
