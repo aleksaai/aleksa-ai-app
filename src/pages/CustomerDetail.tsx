@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import type { Customer, VoiceAgent, PricingPlan, Integration } from '../types/db'
+import type { Customer, VoiceAgent, PricingPlan, Integration, CustomerPermissions } from '../types/db'
 import { AddVoiceAgentDialog } from '../components/AddVoiceAgentDialog'
 import { AssignPricingDialog } from '../components/AssignPricingDialog'
 
@@ -18,6 +18,8 @@ export function CustomerDetail() {
   const { user, signOut } = useAuth()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [agents, setAgents] = useState<AgentRow[]>([])
+  const [permissions, setPermissions] = useState<CustomerPermissions | null>(null)
+  const [permSaving, setPermSaving] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [addAgentOpen, setAddAgentOpen] = useState(false)
   const [assignAgent, setAssignAgent] = useState<AgentRow | null>(null)
@@ -33,7 +35,25 @@ export function CustomerDetail() {
       .eq('customer_id', id)
       .order('created_at', { ascending: false })
     setAgents((a ?? []) as AgentRow[])
+
+    const { data: p } = await supabase
+      .from('customer_permissions').select('*').eq('customer_id', id).maybeSingle()
+    setPermissions(p as CustomerPermissions | null)
+
     setLoading(false)
+  }
+
+  const togglePermission = async (key: keyof CustomerPermissions, value: boolean) => {
+    if (!id || !permissions) return
+    setPermSaving(key)
+    const { error } = await supabase
+      .from('customer_permissions')
+      .update({ [key]: value })
+      .eq('customer_id', id)
+    if (!error) {
+      setPermissions({ ...permissions, [key]: value })
+    }
+    setPermSaving(null)
   }
 
   useEffect(() => {
@@ -106,6 +126,40 @@ export function CustomerDetail() {
                 </div>
               </div>
             </section>
+
+            {permissions && (
+              <section className="card mb-6">
+                <div className="mb-3">
+                  <h2 className="text-lg font-semibold">Kundenzugriff</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Was {customer.name} im eigenen Dashboard sehen + editieren darf.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {([
+                    ['can_edit_agent_config', 'Agent-Config bearbeiten', 'System-Prompt, Begrüßung, Voice ändern (Live-Sync zu ElevenLabs)'],
+                    ['can_edit_kb', 'Wissensdatenbank verwalten', 'KB-Docs erstellen + dem Agent zuweisen, RAG toggle'],
+                    ['can_view_calls', 'Calls einsehen', 'Liste der Anrufe (Datum, Dauer) — V2'],
+                    ['can_view_transcripts', 'Transkripte einsehen', 'Vollständiges Conversation-Transcript pro Call — V2'],
+                    ['can_view_audio', 'Audio einsehen', 'Audio-Aufnahmen pro Call — V2'],
+                  ] as const).map(([key, label, hint]) => (
+                    <label key={key} className="flex cursor-pointer items-center justify-between rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
+                      <div>
+                        <div className="text-sm font-medium text-slate-900">{label}</div>
+                        <div className="text-xs text-slate-500">{hint}</div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={permissions[key] as boolean}
+                        disabled={permSaving === key}
+                        onChange={(e) => togglePermission(key, e.target.checked)}
+                        className="h-5 w-5"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section>
               <div className="mb-4 flex items-center justify-between">
@@ -208,3 +262,8 @@ export function CustomerDetail() {
     </div>
   )
 }
+
+// Render Permissions section inside CustomerDetail
+// (component-private since it's only used here)
+// — using a const expression so it can capture togglePermission via closure
+

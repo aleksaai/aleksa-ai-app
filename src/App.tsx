@@ -12,6 +12,7 @@ import { Integrations } from './pages/Integrations'
 import { CustomerPreview } from './pages/CustomerPreview'
 import { AgentsList } from './pages/AgentsList'
 import { AgentDetail } from './pages/AgentDetail'
+import { CustomerAgentDetail } from './pages/CustomerAgentDetail'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -109,6 +110,14 @@ export default function App() {
         element={
           <RequireAuth>
             <Dashboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard/agents/:id"
+        element={
+          <RequireAuth>
+            <CustomerAgentDetail />
           </RequireAuth>
         }
       />

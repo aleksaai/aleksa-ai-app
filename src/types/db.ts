@@ -77,3 +77,14 @@ export type CustomerInvitation = {
   expires_at: string
   created_at: string
 }
+
+export type CustomerPermissions = {
+  customer_id: string
+  can_view_calls: boolean
+  can_view_transcripts: boolean
+  can_view_audio: boolean
+  can_edit_agent_config: boolean
+  can_edit_kb: boolean
+  created_at: string
+  updated_at: string
+}

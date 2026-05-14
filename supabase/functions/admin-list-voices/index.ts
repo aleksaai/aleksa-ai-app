@@ -39,12 +39,23 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     const { data: profile } = await supabaseAdmin
-      .from('profiles').select('role').eq('id', user.id).maybeSingle()
-    if (profile?.role !== 'admin') return json({ error: 'admin_only' }, 403)
+      .from('profiles').select('role, customer_id').eq('id', user.id).maybeSingle()
+    if (!profile) return json({ error: 'no_profile' }, 403)
 
     const body = await req.json().catch(() => ({}))
     const integration_id = (body.integration_id ?? '').toString().trim()
     if (!integration_id) return json({ error: 'integration_id_required' }, 400)
+
+    // Customer-Owner: needs can_edit_agent_config AND must own a voice_agent using this integration
+    if (profile.role !== 'admin') {
+      if (profile.role !== 'customer_owner') return json({ error: 'forbidden' }, 403)
+      const { data: perms } = await supabaseAdmin
+        .from('customer_permissions').select('can_edit_agent_config').eq('customer_id', profile.customer_id).maybeSingle()
+      if (!perms?.can_edit_agent_config) return json({ error: 'permission_denied' }, 403)
+      const { data: ownsAgent } = await supabaseAdmin
+        .from('voice_agents').select('id').eq('integration_id', integration_id).eq('customer_id', profile.customer_id).limit(1)
+      if (!ownsAgent || ownsAgent.length === 0) return json({ error: 'no_agent_using_integration' }, 403)
+    }
 
     const { data: integration } = await supabaseAdmin
       .from('integrations').select('api_key, platform, region').eq('id', integration_id).maybeSingle()

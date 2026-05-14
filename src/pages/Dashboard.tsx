@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import type { Customer, VoiceAgent, PricingPlan, Integration } from '../types/db'
+import type { Customer, VoiceAgent, PricingPlan, Integration, CustomerPermissions } from '../types/db'
 import { getCustomerBillingPortalUrl } from '../lib/api'
 import {
   formatMoney,
@@ -48,6 +49,7 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [agents, setAgents] = useState<AgentRow[]>([])
   const [callsByAgent, setCallsByAgent] = useState<Record<string, CallRow[]>>({})
+  const [perms, setPerms] = useState<CustomerPermissions | null>(null)
   const [loading, setLoading] = useState(true)
   const [openAgentId, setOpenAgentId] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
@@ -76,6 +78,14 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
         .order('created_at', { ascending: false })
       setAgents((a ?? []) as AgentRow[])
 
+      // Permissions (so we know whether to show 'Konfigurieren →' buttons)
+      const { data: p } = await supabase
+        .from('customer_permissions')
+        .select('*')
+        .eq('customer_id', targetCustomerId)
+        .maybeSingle()
+      setPerms(p as CustomerPermissions | null)
+
       // Fetch all calls for this customer (RLS lets owner see only own)
       const { data: cs } = await supabase
         .from('calls')
@@ -92,6 +102,8 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
       setLoading(false)
     })()
   }, [targetCustomerId])
+
+  const canConfigureAgent = (perms?.can_edit_agent_config ?? false) || (perms?.can_edit_kb ?? false)
 
   const handleOpenBillingPortal = async () => {
     if (isAdminPreview) {
@@ -251,6 +263,14 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
                       <span className="text-slate-500">
                         Abrechnungszeitraum: <strong>{periodLabel(sub.current_period_start, sub.current_period_end)}</strong>
                       </span>
+                    </div>
+                  )}
+
+                  {canConfigureAgent && !isAdminPreview && (
+                    <div className="mt-3 flex justify-end">
+                      <Link to={`/dashboard/agents/${agent.id}`} className="btn-primary text-sm">
+                        Agent konfigurieren →
+                      </Link>
                     </div>
                   )}
 
