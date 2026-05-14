@@ -13,6 +13,7 @@ import { CustomerPreview } from './pages/CustomerPreview'
 import { AgentsList } from './pages/AgentsList'
 import { AgentDetail } from './pages/AgentDetail'
 import { CustomerAgentDetail } from './pages/CustomerAgentDetail'
+import { CallDetail } from './pages/CallDetail'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -118,6 +119,22 @@ export default function App() {
         element={
           <RequireAuth>
             <CustomerAgentDetail />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard/calls/:id"
+        element={
+          <RequireAuth>
+            <CallDetail />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/calls/:id"
+        element={
+          <RequireAuth>
+            <CallDetail />
           </RequireAuth>
         }
       />

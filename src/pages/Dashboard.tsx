@@ -104,6 +104,9 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
   }, [targetCustomerId])
 
   const canConfigureAgent = (perms?.can_edit_agent_config ?? false) || (perms?.can_edit_kb ?? false)
+  const canViewCalls = perms?.can_view_calls ?? false
+  // Admin viewing as customer sees calls regardless of customer's permission
+  const showCallsLog = isAdminPreview || canViewCalls
 
   const handleOpenBillingPortal = async () => {
     if (isAdminPreview) {
@@ -275,7 +278,7 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
                   )}
 
                   {/* Expanded: Calls log */}
-                  {isOpen && (
+                  {isOpen && showCallsLog && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
@@ -292,11 +295,19 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
                                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Datum</th>
                                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Dauer</th>
                                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Ende</th>
+                                <th className="px-3 py-2"></th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
                               {periodCalls.map((c) => (
-                                <tr key={c.id}>
+                                <tr
+                                  key={c.id}
+                                  className="cursor-pointer hover:bg-slate-50"
+                                  onClick={() => {
+                                    const path = isAdminPreview ? `/admin/calls/${c.id}` : `/dashboard/calls/${c.id}`
+                                    window.location.href = path
+                                  }}
+                                >
                                   <td className="px-3 py-2 text-xs text-slate-700">
                                     {new Date(c.started_at).toLocaleString('de-DE', {
                                       day: '2-digit',
@@ -310,12 +321,25 @@ export function Dashboard({ customerIdOverride, isAdminPreview }: Props = {}) {
                                   <td className="px-3 py-2 text-xs text-slate-500">
                                     {c.termination_reason ?? '—'}
                                   </td>
+                                  <td className="px-3 py-2 text-right">
+                                    <span className="text-xs text-brand-700">Details →</span>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
                         </div>
                       )}
+                    </motion.div>
+                  )}
+
+                  {isOpen && !showCallsLog && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-4 border-t border-slate-200 pt-4 text-xs text-slate-500"
+                    >
+                      Calls-Einsicht ist für deinen Account nicht freigeschaltet.
                     </motion.div>
                   )}
                 </motion.div>

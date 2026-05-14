@@ -348,6 +348,79 @@ export async function adminCreateKbDoc(input: { integration_id: string; name: st
   return data.doc
 }
 
+// ─── Call Detail ────────────────────────────────────────────────
+
+export type TranscriptTurn = {
+  role: 'user' | 'agent' | string
+  message: string | null
+  time_in_call_secs?: number
+}
+
+export type CallDetail = {
+  ok: true
+  id: string
+  conversation_id: string
+  started_at: string
+  duration_secs: number
+  cost_credits: number | null
+  termination_reason: string | null
+  agent_name: string | null
+  customer_name: string | null
+  transcript: TranscriptTurn[] | null
+  transcript_summary: string | null
+  audio_available: boolean
+  permissions: {
+    canViewCalls: boolean
+    canViewTranscripts: boolean
+    canViewAudio: boolean
+  }
+}
+
+export async function adminGetCallDetail(call_id: string): Promise<CallDetail> {
+  const { data, error } = await supabase.functions.invoke<CallDetail>('admin-get-call-detail', {
+    body: { call_id },
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data
+}
+
+// Returns an authenticated blob URL for the call audio.
+// Caller must URL.revokeObjectURL when done.
+export async function fetchCallAudioBlobUrl(call_id: string): Promise<string> {
+  const { data: sess } = await supabase.auth.getSession()
+  const token = sess.session?.access_token
+  if (!token) throw new Error('not_authenticated')
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-get-call-audio`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ call_id }),
+  })
+  if (!res.ok) {
+    let detail = ''
+    try {
+      const errBody = await res.json()
+      detail = errBody.error ?? ''
+    } catch {}
+    throw new Error(`audio_fetch_failed: ${res.status} ${detail}`)
+  }
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
+}
+
 export async function adminUpdateAgentKb(input: {
   voice_agent_id: string
   knowledge_base: KBEntry[]
