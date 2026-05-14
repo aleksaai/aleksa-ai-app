@@ -35,12 +35,18 @@ type CreateInput = {
   per_minute_overage_cents?: number
 }
 
+// Pin Stripe API version to pre-Meters-Era to keep the legacy
+// `recurring.usage_type: metered` + usage_records flow working.
+// Migration to the new Meters API is V1 material (see SPEC.md V1.5).
+const STRIPE_API_VERSION = '2024-12-18.acacia'
+
 async function stripeForm(path: string, key: string, params: Record<string, string>) {
   const res = await fetch(`https://api.stripe.com/v1${path}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/x-www-form-urlencoded',
+      'Stripe-Version': STRIPE_API_VERSION,
     },
     body: new URLSearchParams(params),
   })
