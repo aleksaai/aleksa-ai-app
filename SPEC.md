@@ -1,9 +1,12 @@
-# SPEC.md — AleksaAI App (Voicedash) v0.1
+# SPEC.md — AleksaAI App
 
-**Status:** Spec approved 2026-05-03 by Aleksa
+**Status:** Spec approved 2026-05-03 by Aleksa — **MVP + V1.5 + V2 (partial) LIVE on `app.aleksa.ai`**
 **Owner:** Marcus (Plan), Aleksa (Execute via Claude Code)
-**Repo:** `aleksaai/aleksa-ai-app`
-**Deployed:** `app.aleksa.ai` (subdomain of marketing site)
+**Repo:** [`aleksaai/aleksa-ai-app`](https://github.com/aleksaai/aleksa-ai-app)
+**Deployed:** https://app.aleksa.ai (subdomain of marketing site)
+
+> 📋 **For current state see `HANDOFF.md`. For what's next see `ROADMAP.md`. For tech details see `ARCHITECTURE.md`.**
+> This file documents the original vision + what's implemented vs. open. Tick marks (✅) indicate shipped features.
 
 ## 1. Was ist das?
 
@@ -19,78 +22,83 @@ Whitelabel-Plattform für Aleksas ElevenLabs-Voice-Agent-Reseller-Business. Erse
 
 ## 3. Kernfunktionen (in 3 Phasen)
 
-### MVP — "ChatDash kündbar"
-1. Aleksa lädt Customer per Email ein → Customer registriert sich → sieht Dashboard mit **Paywall-Overlay** ("Bitte Zahlungsmethode hinterlegen")
-2. Customer hinterlegt Karte über Stripe Setup-Intent → Paywall verschwindet
-3. Aleksa weist im Admin pro Voice-Agent ein Pricing-Paket zu → Stripe-Subscription wird sofort aktiv
-4. ElevenLabs `post_call_webhook` feuert nach jedem Call → Edge Function trackt Customer-ID + Agent-ID + Sekunden + ElevenLabs-Cost in Supabase
-5. Daily Cron-Job pusht aufsummierte Minuten als Stripe `usage_records` an die jeweilige Subscription
-6. Stripe stellt monatlich automatisch Rechnung + bucht Karte ab → Customer kriegt Stripe-Customer-Portal-Link für Rechnungen/Zahlungsmethoden
+### MVP — "ChatDash kündbar" ✅ LIVE
 
-**MVP Customer-View:** Paywall + nach Bezahlung leeres Dashboard "Hi, du bist live, Rechnungen kommen monatlich" + Link zu Stripe Customer Portal. Kein Selfservice am Voice Agent.
+1. ✅ Aleksa lädt Customer per Email ein → Customer registriert sich → sieht Dashboard mit **Paywall-Overlay**
+2. ✅ Customer hinterlegt Karte über Stripe Setup-Intent → Paywall verschwindet
+3. ✅ Aleksa weist im Admin pro Voice-Agent ein Pricing-Paket zu → Stripe-Subscription wird sofort aktiv
+4. ✅ ElevenLabs `post_call_webhook` feuert nach jedem Call → Edge Function trackt Call in `calls` Tabelle
+5. ✅ Daily Cron-Job (02:00 UTC) pusht aufsummierte Minuten als Stripe `usage_records`
+6. ✅ Stripe stellt automatisch Rechnung + bucht Karte ab → Customer kriegt Stripe-Customer-Portal-Link
 
-### V1.5 — "Vision-Sidebar im Admin" (Aleksas Vision 2026-05-14)
+**MVP Customer-View:** ✅ Paywall + nach Bezahlung Dashboard mit Stats pro Voice-Agent + "Abo verwalten" → Stripe Portal.
+
+### V1.5 — "Vision-Sidebar im Admin" (Aleksas Vision 2026-05-14) ✅ LIVE
 
 Admin-Panel mit Sidebar + 4 Top-Level-Tabs:
 
-**Tab 1: Kunden**
-- Liste (haben wir im MVP)
-- Klick auf Kunde → Detail-Page mit Sub-Tabs:
-  - **Übersicht** — Name, Dashboard-Sprache (DE/EN/HU), Stripe-Status, Branding
-  - **Zugewiesene Agenten** — Liste der Agents die diesem Customer zugewiesen sind (aus Tab 2). Add/Remove. Pro Agent: aktive Subscription anzeigen
-  - **Kundenzugriff** — Toggles pro Feature, was der Customer in seinem Dashboard sehen darf:
-    - Gespräche (Calls-Log)
-    - Transkripte
-    - Audiodateien
-    - Analysen (Anzahl Calls, Dauer, Kosten)
-    - Wissensdatenbank-Editor (Read/Write)
-    - Agenten-Konfiguration-Editor (System Prompt, First Message, LLM-Modell, Voice)
+**Tab 1: Kunden** ✅
+- ✅ Liste (haben wir im MVP)
+- ✅ Klick auf Kunde → Detail-Page:
+  - ✅ **Übersicht** — Name, Status, Stripe-Customer-ID
+  - ✅ **Zugewiesene Agenten** — Add/Remove. Pro Agent: aktive Subscription
+  - ✅ **Kundenzugriff** — 5 Toggles (alle implementiert in `customer_permissions` table):
+    - ✅ Gespräche (Calls-Log) → `can_view_calls`
+    - ✅ Transkripte → `can_view_transcripts`
+    - ✅ Audiodateien → `can_view_audio`
+    - ⏳ Analysen — implizit über Dashboard Stats, kein dedicated toggle
+    - ✅ Wissensdatenbank-Editor → `can_edit_kb`
+    - ✅ Agenten-Konfiguration-Editor → `can_edit_agent_config`
+  - ✅ "👁 Als Customer ansehen" Button → `/admin/customers/:id/view` Preview-Mode
 
-**Tab 2: Agenten**
-- Liste eigener ElevenLabs + RetellAI Agents
-- "Neuer Agent" → Form mit Platform-Switcher (ElevenLabs / RetellAI), Agent-ID, Display-Name, Region (US/EU für RetellAI)
-- Klick auf Agent → Detail-Page mit Tabs:
-  - **Übersicht** — Agent-ID, API-Platform, Region, eventuelle Phone-Number-ID, Verknüpfter Customer (oder "frei")
-  - **Prompt + First Message** — Editor, schreibt direkt via ElevenLabs `patch_agent` / RetellAI `update_agent`
-  - **Tools** (V2) — Editor für Webhook-Tools
-  - **Webhook-Config** (RetellAI) — Post-Call-Webhook-URL anzeigen (read-only)
+**Tab 2: Agenten** ✅
+- ✅ Liste eigener ElevenLabs Agents (RetellAI/Vapi/OpenAI Integrations-Layer ready aber Provider-API-Calls noch ElevenLabs-only)
+- ✅ "Neuer Agent" via AddVoiceAgentDialog mit Integration-Dropdown + Provider-API-Agents-Liste (kein manuelles ID-Tippen mehr)
+- ✅ Klick auf Agent → `/admin/agents/:id` Detail-Page mit 4 Tabs:
+  - ✅ **Übersicht** — IDs + LLM + Voice + Phone + Customer + Integration
+  - ✅ **Prompt + First Message** — Editor → PATCH zu ElevenLabs
+  - ✅ **Stimme** — Voice-Picker mit ElevenLabs Voice-Library + Preview-Audio
+  - ✅ **Wissensdatenbank** — Workspace-Docs + per-Agent-Assignment + RAG-Toggle + "+ Neuer Doc"-Modal
+  - ⏳ **Tools** — Editor für Webhook-Tools (deferred; ElevenLabs PATCH API kann tools nicht modifizieren, braucht create_agent_full + rebuild — siehe Marcus' knowledge.md)
 
-**Tab 3: Abrechnungen** (Sub-Tabs)
-- **Produkte:** Liste aller Pricing-Pakete + "Neues Produkt" mit 3 Modi:
-  1. **Grundabo + Nutzung** — flat_amount + included_minutes + per_minute_overage + currency + interval (month/year)
-  2. **Nur Nutzungsbasiert** — per_minute + currency + interval (default: month)
-  3. **Einmalig** — one_time_amount + currency
-- **Abos:** Liste aller aktiven Subscriptions + "Neues Abo" mit Form:
-  - Kunde wählen (dropdown)
-  - Agent wählen (dropdown, gefiltert auf Customer-zugewiesene Agents)
-  - Startdatum (default: heute)
-  - Produkt wählen (dropdown)
-  - → Erstellt Stripe-Subscription mit allen passenden Stripe Prices
+**Tab 3: Abrechnungen** ⏳ — Aktuell als flacher Tab "Pricing-Pakete". Geplant: Sub-Tabs Produkte + Abos
+- ✅ **Produkte (= aktuell Pricing-Pakete):** alle 3 Modi (Grundabo+Nutzung, Nur Nutzungsbasiert, Einmalig) implementiert
+- ⏳ **Abos:** Liste + "+ Neues Abo" Form (aktuell muss man durch Customer-Detail navigieren — in Roadmap)
 
-**Tab 4: Einstellungen** — Account, API-Tokens, Resend-Verifikation, Webhook-URLs als Reference
+**Tab 4: Einstellungen** ⏳ — Aktuell als "Integrationen" Tab. Geplant: zusätzliche Account-Settings (in Roadmap)
 
-### V2 — "Customer-Selfservice + Live-Sync"
+### V2 — "Customer-Selfservice + Live-Sync" ✅ PARTIAL LIVE
 
 **Customer-Dashboard** (was der eingeloggte Customer sieht):
-- Beim Login: Liste der ihm zugewiesenen Agenten
-- Klick auf Agent → Sidebar mit Items (gefiltert basiert auf Kundenzugriff-Permissions vom Admin):
-  - **Analysen** — Total Calls, Total Minutes, durchschnittliche Dauer, Cost-pro-Periode
-  - **Gespräche** — Liste der Calls mit Transkript-Snippet + Audio-Player (fetched von ElevenLabs/RetellAI API)
-  - **Wissensdatenbank** — Editor: docs erstellen/editieren → wird an Agent über ElevenLabs `patch_agent` mit `knowledge_base` array gepatcht
-  - **Agentenkonfiguration** — Editor für System Prompt, First Message, Voice, LLM-Modell → live-sync zu ElevenLabs/RetellAI
-  - **Abo-Details**:
-    - Abrechnungszeitraum (z.B. 27. April – 27. Mai 2026)
-    - Aktuelle Gesamtkosten (live, basiert auf `calls.duration_secs * pricing_plan`)
-    - Gesamtnutzung (z.B. 27:30 Min)
-    - Kosten pro Minute (statisch aus Pricing-Plan)
-    - Button "Abo verwalten" → öffnet Stripe Customer Portal in neuem Tab
+- ✅ Beim Login: Liste der ihm zugewiesenen Agenten
+- ✅ Pro Agent: Stats-Card (Anrufe, Gesamt-Nutzung, Aufgerundet, Aktuelle Kosten projiziert)
+- ✅ Abrechnungszeitraum aus `customer_subscriptions`
+- ✅ "Abo verwalten" → Stripe Customer Portal (via `customer-billing-portal` Edge Function)
+- ✅ "Agent konfigurieren →" Button wenn permissions gesetzt → `/dashboard/agents/:id` mit Tabs (filtered by permissions):
+  - ✅ Übersicht (immer)
+  - ✅ Prompt & Begrüßung (`can_edit_agent_config`)
+  - ✅ Stimme (`can_edit_agent_config`)
+  - ✅ Wissensdatenbank (`can_edit_kb`)
+- ✅ Call-Detail-Page `/dashboard/calls/:id` (permission-gated):
+  - ✅ Metadata immer
+  - ✅ Transkript (Chat-Bubble-UI) wenn `can_view_transcripts`
+  - ✅ Audio-Player wenn `can_view_audio` (proxied via `admin-get-call-audio` — API key bleibt server-side)
+  - ✅ Zusammenfassung (ElevenLabs Analysis transcript_summary) wenn `can_view_transcripts`
 
-**Whitelabel-Polish:**
-- Pro Customer: eigene Subdomain (`<slug>.app.aleksa.ai`) oder Custom-Domain (`portal.vv-cars.de` → CNAME)
-- Pro Customer: Logo + Primary-Color in `customers.branding` jsonb
+**B2B-Steuer-Handling** ✅ LIVE (zusätzlich zur Vision):
+- ✅ Onboarding fragt B2C/B2B → B2B-Mode zeigt Firmenname + USt-ID Felder
+- ✅ Edge Function `update-customer-business` setzt Stripe Customer.name + tax_id (`type: eu_vat`)
+- ✅ Stripe validiert VAT-ID gegen EU-VIES-Datenbank
+- ✅ Stripe Tax wendet automatisch Reverse-Charge an für cross-border B2B (0% MwSt)
+
+**Whitelabel-Polish:** ⏳ Roadmap — siehe `ROADMAP.md` § "Whitelabel V2"
+- Pro Customer: eigene Subdomain (`<slug>.app.aleksa.ai`) oder Custom-Domain
+- Pro Customer: Logo + Primary-Color in `customers.branding` jsonb (Schema bereit, UI fehlt)
 - Email-Templates per Customer brandbar (optional)
 
 ## 4. Daten-Modell (Supabase: `puimwizupgkdvxpanlhy`)
+
+> 📋 Live-Schema (8 Tables inkl. `integrations` + `customer_permissions` aus späteren Migrations) ist in **`ARCHITECTURE.md` § Database Schema** dokumentiert. Onten der Original-Spec — nicht das aktuelle Live-Schema.
 
 ```sql
 -- Auth (Supabase built-in: auth.users)

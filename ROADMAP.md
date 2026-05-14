@@ -1,0 +1,127 @@
+# ROADMAP.md — What's Next
+
+> Tracks what's NOT yet built. Update when features ship.
+
+## ✅ Shipped (chronological)
+
+### MVP "ChatDash kündbar"
+1. ✅ Vite scaffold + Magic Link Auth + Supabase setup
+2. ✅ DB schema (7 → 8 tables with RLS)
+3. ✅ Stripe Tax + Webhook + Customer Portal config
+4. ✅ admin-create-customer Edge Function + Customer-CRUD UI
+5. ✅ webhook-stripe Edge Function
+6. ✅ Onboarding-Flow with Paywall + Stripe Setup-Intent
+7. ✅ Pricing-Plans CRUD with 3 modes (hybrid, per_minute, one_time)
+8. ✅ Voice-Agent + Subscription assignment
+9. ✅ ElevenLabs Webhook (call tracking)
+10. ✅ Daily Cron für Stripe Usage Reporting
+
+### V1.5 "Vision Layer"
+11. ✅ Integrations-Layer (ElevenLabs/RetellAI/Vapi/OpenAI Provider Accounts with US/EU region)
+12. ✅ Voice-Agent auto-fetched from Provider API (no manual ID entry)
+13. ✅ Agenten-Tab im Admin (alle Agents across customers)
+14. ✅ Agent-Detail with Prompt + Voice + Knowledge Base editor (live-sync to ElevenLabs)
+15. ✅ B2C/B2B Toggle + EU VAT ID for Reverse-Charge tax handling
+16. ✅ Customer Dashboard with live stats per agent
+17. ✅ Stripe Customer Portal integration
+18. ✅ Admin "View as Customer" mode
+
+### V2 "Self-Service + Call Inspection"
+19. ✅ Customer Permissions System (5 toggles)
+20. ✅ Customer-Selfservice for Agent Config (Prompt/Voice/KB)
+21. ✅ Call-Detail Page with Transcript + Audio (permission-gated)
+22. ✅ Audio Proxy Edge Function (keeps API key server-side)
+
+### Documentation
+23. ✅ CLAUDE.md — project context
+24. ✅ ARCHITECTURE.md — technical deep-dive
+25. ✅ SPEC.md — original spec + V1.5/V2 done-markers
+26. ✅ TESTING.md — end-to-end test plan
+27. ✅ HANDOFF.md — current state
+28. ✅ ROADMAP.md — this file
+
+---
+
+## 🔜 Next Up (priorities for upcoming sessions)
+
+### "Abrechnungen-Tab" (~1.5h)
+Replace flat "Pricing-Pakete" tab with two sub-tabs:
+- **Produkte** = current pricing-plans page (rename)
+- **Abos** = NEW: list of all customer_subscriptions across customers, with status + plan + customer + agent + Stripe-link. "+ Neues Abo" form: pick customer → pick agent (must be assigned to customer) → pick plan → submit (replaces current per-customer-detail flow)
+- Bonus: **Calls** sub-tab — flat list of all calls across customers (Admin only) for ops review
+
+### RetellAI Support (~2h)
+Backend foundation is ready (Integrations Layer accepts platform=retellai). Needs:
+- Implement `listRetellAiAgents` in `admin-list-platform-agents` (uses `GET https://api.retellai.com/list-agents`)
+- Implement Retell branch in `admin-get-agent-config` / `admin-update-agent-config` (different API shape than ElevenLabs)
+- Build `webhook-retellai` Edge Function (Retell's post-call webhook signature scheme)
+- Update voice picker (Retell voices vs ElevenLabs voices)
+- Update Frontend dropdown logic to handle Retell quirks (no phone number_id, different agent_id format)
+
+### Whitelabel V2 (~2-3h)
+- Per-customer subdomain (`vv-cars.app.aleksa.ai`) → Netlify wildcard cert + routing config
+- Customer-branding section in admin: logo upload (Supabase Storage) + primary color picker → persisted in `customers.branding` jsonb
+- Frontend: read branding on login → swap logo + CSS variable for accent color
+- Optional Custom Domain (`portal.vv-cars.de`) via CNAME + DNS verification flow
+
+### Calls Analytics (~1h)
+- Admin dashboard widget: total minutes / calls / revenue this period across all customers
+- Per-customer drill-down: rolling 30-day chart of minutes
+- Cost margin tracking: ElevenLabs Credits ↔ EUR conversion (per workspace tier) vs. Stripe revenue
+
+### Live-Mode Switch (one-off, when ready)
+Plan-Doc TBD. Major items:
+- Switch Stripe Secret + Publishable + Webhook keys to live versions
+- Re-register ElevenLabs Webhook URL on production Stripe (signing secret changes)
+- DNS test: confirm `app.aleksa.ai` SSL valid
+- ChatDash overlap-period plan (1 week parallel)
+- Document the migration in `MIGRATION.md`
+
+---
+
+## 🔭 Future Ideas (not on near-term roadmap)
+
+| Idea | Why later |
+|---|---|
+| **Stripe Meters API migration** | Pinning `2024-12-18.acacia` works for now. Migrate when Stripe deprecates the old usage_records API. Will rework Step 9 to send `meter_events` instead of `usage_records` |
+| **Vapi & OpenAI integration parity** | Lower-priority providers; Aleksa primarily ElevenLabs/RetellAI |
+| **Multi-Admin support** | Currently only Aleksa is admin. Add team/seat model when business grows |
+| **Customer-to-Customer agent sharing** | Currently each agent belongs to exactly one customer. Some advanced use cases (white-label resellers?) would need many-to-many |
+| **iOS/Android mobile dashboard** | Web-responsive is enough for V2; mobile-native is a year-out concern |
+| **Public API for customers** | When customers want to programmatically integrate (e.g. CRM sync). Not requested yet |
+| **Tools editor in agent UI** | ElevenLabs PATCH API can't modify tools (only rebuild). Would need a rebuild-via-`create_agent_full` flow + phone-reassign dance. Marcus' `knowledge.md` has the pattern |
+| **Knowledge Base file upload (PDF, docs)** | Currently only text-based KB. ElevenLabs supports file uploads via `/v1/convai/knowledge-base/file` — implement when needed |
+| **Real-time call dashboard** | Live call indicator + listen-in feature. Requires ElevenLabs WebRTC integration |
+| **Reseller mode** (Aleksa's customers reselling to their own customers) | Wait until first customer asks for it |
+
+---
+
+## Architectural Tech-Debt
+
+| Item | Severity | Effort |
+|---|---|---|
+| 6 Edge Functions called `admin-*` but actually accept customer_owner — rename to `agent-*` / `kb-*` etc. | Low (cosmetic) | ~30 min |
+| ElevenLabs EU base URL switch hardcoded as `return 'https://api.elevenlabs.io'` in 9 places | Medium (when Enterprise upgrade) | ~30 min |
+| Stripe Webhook handler logs `setup_intent.succeeded` failures only to console — no DB persistence | Low | ~15 min — add an `event_log` table |
+| `customer_subscriptions.stripe_subscription_id` overloaded for one_time (stores invoice_id) | Medium (works, but confusing) | ~1h — add separate `stripe_invoice_id` column |
+| No retry on transient Stripe API errors in cron | Medium | ~30 min — wrap stripeForm in retry-with-backoff |
+| API keys stored plaintext in `integrations.api_key` | High (medium-term) | ~3h — use Supabase Vault + decrypt server-side. RLS already locks them to admin-only reads but defense-in-depth is worth it |
+| `pg_cron` SQL has CRON_SECRET hardcoded; rotating the secret means updating both Supabase Secret AND cron schedule | Low | document in MIGRATION.md when first rotation happens |
+| Same `display_name` field used for both human-facing display + invitation-email fallback — could diverge | Low | won't fix until it breaks |
+
+---
+
+## Test-Pause Checklist (Before Live Migration)
+
+Before flipping to Stripe Live keys + onboarding the first real customer:
+
+- [ ] Walk through every section of `TESTING.md`
+- [ ] One end-to-end test from customer-invite to first Stripe-charged invoice
+- [ ] Verify Stripe Tax: 0% MwSt invoice for valid EU B2B VAT
+- [ ] Verify Reverse-Charge wording on Stripe-generated invoice PDF
+- [ ] Verify cron actually ran 02:00 UTC last night (check `cron.job_run_details`)
+- [ ] Verify Resend domain `projekt.aleksa.ai` still active + email arrives
+- [ ] Backup Supabase DB before migration (Supabase Dashboard → Database → Backups)
+- [ ] Plan: VV-Cars migration with 1 week of parallel ChatDash overlap
+
+Once everything green: switch to Live mode, migrate VV-Cars, ChatDash cancellation 1 week later.
