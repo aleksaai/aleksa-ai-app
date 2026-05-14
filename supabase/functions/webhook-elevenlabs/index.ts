@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
   const metadata = data.metadata ?? {}
   const start_time_unix_secs = metadata.start_time_unix_secs as number | undefined
   const call_duration_secs = metadata.call_duration_secs as number | undefined
-  const cost = metadata.cost as number | undefined // USD float (not cents)
+  const cost_credits = metadata.cost as number | undefined // ElevenLabs Credits (NOT USD/cents)
   const termination_reason = metadata.termination_reason as string | undefined
 
   if (!agent_id || !conversation_id || call_duration_secs == null || start_time_unix_secs == null) {
@@ -133,9 +133,11 @@ Deno.serve(async (req) => {
     return json({ received: true, ignored: 'unregistered_agent' })
   }
 
-  // Cost arrives in USD as a float (e.g. 0.087 = 8.7 cents).
-  // Round to whole cents for our integer column.
-  const cost_cents = cost != null ? Math.round(cost * 100) : null
+  // ElevenLabs ships `cost` as raw Credits (their internal unit). Persist as-is —
+  // converting Credits → USD/EUR requires knowing the workspace tier (Creator,
+  // Pro, Scale, Enterprise) since the credit-to-dollar ratio varies. We do that
+  // mapping in the UI / margin reports instead of at ingest time.
+  const cost_credits_int = cost_credits != null ? Math.max(0, Math.round(cost_credits)) : null
 
   // Insert (idempotent via UNIQUE elevenlabs_conversation_id)
   const { error: insErr } = await supabaseAdmin
@@ -146,7 +148,7 @@ Deno.serve(async (req) => {
       elevenlabs_conversation_id: conversation_id,
       started_at: new Date(start_time_unix_secs * 1000).toISOString(),
       duration_secs: Math.max(0, Math.floor(call_duration_secs)),
-      elevenlabs_cost_cents: cost_cents,
+      elevenlabs_cost_credits: cost_credits_int,
       termination_reason: termination_reason ?? null,
       raw_payload: data,
     })
