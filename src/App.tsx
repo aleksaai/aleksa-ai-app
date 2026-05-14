@@ -10,6 +10,8 @@ import { PricingPlans } from './pages/PricingPlans'
 import { CustomerDetail } from './pages/CustomerDetail'
 import { Integrations } from './pages/Integrations'
 import { CustomerPreview } from './pages/CustomerPreview'
+import { AgentsList } from './pages/AgentsList'
+import { AgentDetail } from './pages/AgentDetail'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -51,6 +53,22 @@ export default function App() {
         element={
           <RequireAuth>
             <Admin />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/agents"
+        element={
+          <RequireAuth>
+            <AgentsList />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/agents/:id"
+        element={
+          <RequireAuth>
+            <AgentDetail />
           </RequireAuth>
         }
       />

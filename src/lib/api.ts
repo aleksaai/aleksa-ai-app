@@ -225,6 +225,84 @@ export type UpdateBusinessInput = {
   vat_id?: string
 }
 
+// ─── admin-get-agent-config ─────────────────────────────────────
+
+export type AgentConfig = {
+  ok: true
+  agent_id: string
+  name: string | null
+  prompt: string
+  llm: string | null
+  first_message: string
+  language: string | null
+  voice_id: string | null
+  tts_model: string | null
+  stability: number | null
+  similarity_boost: number | null
+}
+
+export async function adminGetAgentConfig(voice_agent_id: string): Promise<AgentConfig> {
+  const { data, error } = await supabase.functions.invoke<AgentConfig>('admin-get-agent-config', {
+    body: { voice_agent_id },
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data
+}
+
+// ─── admin-update-agent-config ──────────────────────────────────
+
+export type UpdateAgentConfigInput = {
+  voice_agent_id: string
+  prompt?: string
+  first_message?: string
+  voice_id?: string
+}
+
+export async function adminUpdateAgentConfig(input: UpdateAgentConfigInput) {
+  const { data, error } = await supabase.functions.invoke('admin-update-agent-config', { body: input })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data
+}
+
+// ─── admin-list-voices ──────────────────────────────────────────
+
+export type Voice = {
+  voice_id: string
+  name: string
+  labels: Record<string, string>
+  preview_url: string | null
+  category: string | null
+}
+
+export async function adminListVoices(integration_id: string): Promise<Voice[]> {
+  const { data, error } = await supabase.functions.invoke<{ ok: true; voices: Voice[] }>('admin-list-voices', {
+    body: { integration_id },
+  })
+  if (error) throw new Error(error.message)
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data.voices
+}
+
 export async function updateCustomerBusiness(input: UpdateBusinessInput) {
   const { data, error } = await supabase.functions.invoke('update-customer-business', { body: input })
   if (error) {

@@ -34,6 +34,7 @@ export function Admin() {
             <h1 className="text-lg font-semibold">AleksaAI Admin</h1>
             <nav className="flex gap-1">
               <Link to="/admin" className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900">Kunden</Link>
+              <Link to="/admin/agents" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Agenten</Link>
               <Link to="/admin/integrations" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Integrationen</Link>
               <Link to="/admin/pricing-plans" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Pricing-Pakete</Link>
             </nav>
