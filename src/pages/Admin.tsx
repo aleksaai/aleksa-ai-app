@@ -1,145 +1,237 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import type { Customer } from '../types/db'
 import { NewCustomerDialog } from '../components/NewCustomerDialog'
+import { AppShell } from '../components/AppShell'
+
+type Kpi = {
+  customers: number
+  agents: number
+  activeSubs: number
+  pendingOnboarding: number
+}
 
 export function Admin() {
-  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [kpi, setKpi] = useState<Kpi>({ customers: 0, agents: 0, activeSubs: 0, pendingOnboarding: 0 })
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  const loadCustomers = async () => {
+  const loadAll = async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (!error && data) setCustomers(data as Customer[])
+    const [{ data: cs }, { count: agentCount }, { count: subCount }] = await Promise.all([
+      supabase.from('customers').select('*').order('created_at', { ascending: false }),
+      supabase.from('voice_agents').select('*', { count: 'exact', head: true }),
+      supabase.from('customer_subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    ])
+    const list = (cs as Customer[]) ?? []
+    setCustomers(list)
+    setKpi({
+      customers: list.length,
+      agents: agentCount ?? 0,
+      activeSubs: subCount ?? 0,
+      pendingOnboarding: list.filter((c) => !c.has_payment_method).length,
+    })
     setLoading(false)
   }
 
   useEffect(() => {
-    loadCustomers()
+    loadAll()
   }, [])
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold">AleksaAI Admin</h1>
-            <nav className="flex gap-1">
-              <Link to="/admin" className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900">Kunden</Link>
-              <Link to="/admin/agents" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Agenten</Link>
-              <Link to="/admin/integrations" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Integrationen</Link>
-              <Link to="/admin/pricing-plans" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Pricing-Pakete</Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600">{user?.email}</span>
-            <button onClick={signOut} className="btn-ghost text-sm">
-              Abmelden
-            </button>
-          </div>
-        </div>
-      </header>
+    <AppShell
+      pageEyebrow="Übersicht"
+      pageTitle={
+        <>
+          Willkommen <span className="heading-accent">zurück</span>
+        </>
+      }
+      pageAction={
+        <button onClick={() => setDialogOpen(true)} className="btn-primary">
+          <PlusIcon /> Neuer Kunde
+        </button>
+      }
+    >
+      {/* ============ KPI ROW ============ */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="Kunden"
+          value={kpi.customers}
+          hint={`${kpi.pendingOnboarding} im Onboarding`}
+          accent
+        />
+        <KpiCard label="Voice-Agenten" value={kpi.agents} hint="Live + im Setup" />
+        <KpiCard label="Aktive Abos" value={kpi.activeSubs} hint="Stripe-Subscriptions" />
+        <KpiCard
+          label="Onboarding offen"
+          value={kpi.pendingOnboarding}
+          hint={kpi.pendingOnboarding > 0 ? 'Brauchen Zahlungsmethode' : 'Alle aktiv'}
+          warn={kpi.pendingOnboarding > 0}
+        />
+      </div>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
+      {/* ============ CUSTOMERS LIST ============ */}
+      <section className="mt-10">
+        <div className="mb-5 flex items-end justify-between">
           <div>
-            <h2 className="text-2xl font-semibold">Customers</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {customers.length === 0
-                ? 'Noch keine Customers. Leg deinen ersten an.'
-                : `${customers.length} aktive ${customers.length === 1 ? 'Customer' : 'Customers'}.`}
-            </p>
+            <p className="eyebrow mb-1">Kundenliste</p>
+            <h2 className="text-xl font-semibold tracking-tight">
+              Alle <span className="heading-accent">Kunden</span>
+            </h2>
           </div>
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="btn-primary"
-          >
-            + Neuer Customer
-          </button>
         </div>
 
         {loading ? (
-          <div className="card text-center text-sm text-slate-500">Lade…</div>
+          <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade…</div>
         ) : customers.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="card text-center"
-          >
-            <h3 className="text-base font-medium">Noch leer hier</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Klick oben rechts auf <strong>Neuer Customer</strong> um anzufangen.
-            </p>
-          </motion.div>
+          <EmptyState onCreate={() => setDialogOpen(true)} />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Email
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Stripe-ID
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    Erstellt
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {customers.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="cursor-pointer hover:bg-slate-50"
-                    onClick={() => (window.location.href = `/admin/customers/${c.id}`)}
-                  >
-                    <td className="px-4 py-3 text-sm font-medium text-slate-900">{c.name}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{c.contact_email}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {c.has_payment_method ? (
-                        <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          Zahlungsmethode hinterlegt
-                        </span>
-                      ) : (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          Pending Onboarding
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                      {c.stripe_customer_id?.slice(0, 18)}…
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">
-                      {new Date(c.created_at).toLocaleDateString('de-DE')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {customers.map((c, i) => (
+              <motion.button
+                key={c.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                whileHover={{ y: -2 }}
+                onClick={() => navigate(`/admin/customers/${c.id}`)}
+                className="group relative overflow-hidden rounded-2xl glass p-5 text-left transition-all hover:shadow-glass-lg"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={c.name} />
+                    <div>
+                      <p className="font-semibold tracking-tight text-ink">{c.name}</p>
+                      <p className="mt-0.5 text-xs text-ink-muted">{c.contact_email}</p>
+                    </div>
+                  </div>
+                  <StatusPill ok={c.has_payment_method} />
+                </div>
+
+                <div className="mt-5 flex items-center justify-between border-t border-white/40 pt-3 text-xs text-ink-muted">
+                  <span>
+                    {new Date(c.created_at).toLocaleDateString('de-DE', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
+                  <span className="font-medium text-brand-700 opacity-0 transition-opacity group-hover:opacity-100">
+                    Öffnen →
+                  </span>
+                </div>
+              </motion.button>
+            ))}
           </div>
         )}
-      </main>
+      </section>
 
-      <NewCustomerDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onCreated={loadCustomers}
-      />
+      <NewCustomerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={loadAll} />
+    </AppShell>
+  )
+}
+
+function KpiCard({
+  label,
+  value,
+  hint,
+  accent,
+  warn,
+}: {
+  label: string
+  value: number | string
+  hint?: string
+  accent?: boolean
+  warn?: boolean
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl glass p-5">
+      {accent && (
+        <div
+          aria-hidden
+          className="absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-30 blur-2xl"
+          style={{ background: 'radial-gradient(circle, #b2a3ff 0%, transparent 70%)' }}
+        />
+      )}
+      <p className="label-soft">{label}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p>
+      {hint && (
+        <p className={`mt-1.5 text-xs ${warn ? 'text-amber-700' : 'text-ink-muted'}`}>{hint}</p>
+      )}
     </div>
+  )
+}
+
+function StatusPill({ ok }: { ok: boolean }) {
+  return ok ? (
+    <span className="pill-success">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      Aktiv
+    </span>
+  ) : (
+    <span className="pill-warn">
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+      Onboarding
+    </span>
+  )
+}
+
+function Avatar({ name }: { name: string }) {
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+  return (
+    <div
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
+      style={{
+        background: 'linear-gradient(135deg, #b2a3ff 0%, #9d8af5 50%, #8676ea 100%)',
+        boxShadow: '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 4px 14px -4px rgba(135,118,234,0.45)',
+      }}
+    >
+      {initials}
+    </div>
+  )
+}
+
+function EmptyState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card-lg p-12 text-center"
+    >
+      <div
+        className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+        style={{ background: 'linear-gradient(135deg, #ede9ff 0%, #c8bcff 100%)' }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6f5fd8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold tracking-tight">
+        Noch <span className="heading-accent">keine Kunden</span>
+      </h3>
+      <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-muted">
+        Leg deinen ersten Kunden an. Du kannst danach Voice-Agenten zuweisen und Pricing-Pakete verknüpfen.
+      </p>
+      <button onClick={onCreate} className="btn-primary mt-6">
+        <PlusIcon /> Ersten Kunden anlegen
+      </button>
+    </motion.div>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
   )
 }

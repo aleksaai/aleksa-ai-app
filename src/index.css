@@ -6,26 +6,252 @@
   html {
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-canvas text-ink antialiased;
+    background-image:
+      radial-gradient(at 8% 6%, rgba(178, 163, 255, 0.18) 0px, transparent 55%),
+      radial-gradient(at 92% 12%, rgba(199, 188, 255, 0.16) 0px, transparent 55%),
+      radial-gradient(at 50% 100%, rgba(157, 138, 245, 0.10) 0px, transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(178, 163, 255, 0.35);
   }
 }
 
 @layer components {
+  /* ============ GLASS SURFACES ============ */
+  .glass {
+    background: rgba(255, 255, 255, 0.62);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.6) inset,
+      0 8px 32px -8px rgba(66, 56, 134, 0.12);
+  }
+  .glass-card {
+    @apply rounded-2xl glass;
+  }
+  .glass-card-lg {
+    background: rgba(255, 255, 255, 0.7);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    backdrop-filter: blur(28px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+      0 24px 60px -20px rgba(66, 56, 134, 0.22);
+    @apply rounded-3xl;
+  }
+  .glass-input {
+    background: rgba(255, 255, 255, 0.65);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(199, 188, 255, 0.35);
+    @apply w-full rounded-xl px-4 py-2.5 text-sm text-ink placeholder:text-ink-dim transition-all;
+  }
+  .glass-input:focus {
+    outline: none;
+    border-color: rgba(157, 138, 245, 0.55);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 0 4px rgba(178, 163, 255, 0.18);
+  }
+
+  /* ============ BUTTONS ============ */
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-primary {
-    @apply btn bg-brand-500 text-white hover:bg-brand-600 focus-visible:ring-brand-500;
+    @apply btn text-white;
+    background: linear-gradient(135deg, #9d8af5 0%, #8676ea 100%);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.35) inset,
+      0 6px 20px -6px rgba(135, 118, 234, 0.55);
+  }
+  .btn-primary:hover {
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.4) inset,
+      0 10px 28px -8px rgba(135, 118, 234, 0.7);
+    transform: translateY(-1px);
   }
   .btn-ghost {
-    @apply btn text-slate-700 hover:bg-slate-100;
+    @apply btn text-ink-soft;
+    background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(199, 188, 255, 0.3);
+  }
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.85);
+    color: #15141c;
+  }
+  .btn-subtle {
+    @apply btn text-ink-soft;
+    background: transparent;
+  }
+  .btn-subtle:hover {
+    background: rgba(199, 188, 255, 0.18);
+    color: #6f5fd8;
+  }
+
+  /* Compatibility — old classes still used in pages we haven't redesigned yet */
+  .card {
+    @apply glass-card p-6;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20;
+    @apply glass-input;
   }
-  .card {
-    @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm;
+
+  /* ============ TYPOGRAPHY ============ */
+  .heading-display {
+    @apply text-display font-semibold tracking-tight text-ink;
+  }
+  .heading-accent {
+    @apply font-serif italic font-normal text-brand-700;
+  }
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-[0.18em] text-brand-700/80;
+  }
+  .label-soft {
+    @apply text-xs font-medium uppercase tracking-wider text-ink-muted;
+  }
+
+  /* ============ AMBIENT BACKGROUNDS ============ */
+  .glow-orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(120px);
+    opacity: 0.55;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .glow-orb-1 {
+    @apply glow-orb;
+    top: -10%;
+    left: -8%;
+    width: 480px;
+    height: 480px;
+    background: radial-gradient(circle, #b2a3ff 0%, transparent 70%);
+  }
+  .glow-orb-2 {
+    @apply glow-orb;
+    top: 20%;
+    right: -10%;
+    width: 520px;
+    height: 520px;
+    background: radial-gradient(circle, #c8bcff 0%, transparent 70%);
+    opacity: 0.45;
+  }
+  .glow-orb-3 {
+    @apply glow-orb;
+    bottom: -15%;
+    left: 30%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, #9d8af5 0%, transparent 70%);
+    opacity: 0.25;
+  }
+  .grid-pattern {
+    background-image:
+      linear-gradient(rgba(178, 163, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(178, 163, 255, 0.08) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+
+  /* ============ PILLS / BADGES ============ */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .pill-success {
+    @apply pill;
+    background: rgba(16, 185, 129, 0.12);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+  }
+  .pill-warn {
+    @apply pill;
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+  }
+  .pill-brand {
+    @apply pill;
+    background: rgba(178, 163, 255, 0.18);
+    color: #6f5fd8;
+    border: 1px solid rgba(178, 163, 255, 0.35);
+  }
+  .pill-neutral {
+    @apply pill;
+    background: rgba(255, 255, 255, 0.55);
+    color: #3d3a4a;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  /* ============ NAV / SIDEBAR ============ */
+  .nav-link {
+    @apply flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-ink-soft transition-all;
+  }
+  .nav-link:hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: #15141c;
+  }
+  .nav-link-active {
+    background: linear-gradient(135deg, rgba(178, 163, 255, 0.28) 0%, rgba(199, 188, 255, 0.18) 100%);
+    color: #574bb0;
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.7) inset,
+      0 4px 16px -6px rgba(135, 118, 234, 0.25);
+  }
+
+  /* ============ TAB SWITCHER (pill style) ============ */
+  .tab-pill-group {
+    @apply inline-flex items-center gap-1 rounded-2xl p-1;
+    background: rgba(255, 255, 255, 0.6);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+  }
+  .tab-pill {
+    @apply rounded-xl px-3.5 py-1.5 text-sm font-medium text-ink-muted transition-all;
+  }
+  .tab-pill:hover {
+    color: #15141c;
+  }
+  .tab-pill-active {
+    background: linear-gradient(135deg, #ffffff 0%, #f6f4ff 100%);
+    color: #574bb0;
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
+      0 4px 12px -4px rgba(135, 118, 234, 0.25);
+  }
+
+  /* ============ TOGGLE SWITCH ============ */
+  .toggle {
+    @apply relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors;
+    background: rgba(0, 0, 0, 0.12);
+  }
+  .toggle-on {
+    background: linear-gradient(135deg, #9d8af5 0%, #b2a3ff 100%);
+  }
+  .toggle-thumb {
+    @apply absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform;
+  }
+  .toggle-on .toggle-thumb {
+    transform: translateX(20px);
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(178, 163, 255, 0.4);
+    border-radius: 3px;
   }
 }
