@@ -4,6 +4,8 @@ import { RequireAuth } from './components/RequireAuth'
 import { Login } from './pages/Login'
 import { Admin } from './pages/Admin'
 import { Dashboard } from './pages/Dashboard'
+import { Invite } from './pages/Invite'
+import { Onboarding } from './pages/Onboarding'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -19,7 +21,11 @@ function HomeRedirect() {
   if (!user) return <Login />
 
   // Role-based redirect once profile is known. Until profile loads, send admin to /admin by default.
-  if (profile?.role === 'customer_owner') return <Navigate to="/dashboard" replace />
+  if (profile?.role === 'customer_owner') {
+    // If customer-owner is missing customer link OR payment method, route through onboarding
+    if (!profile.customer_id) return <Navigate to="/onboarding" replace />
+    return <Navigate to="/dashboard" replace />
+  }
   return <Navigate to="/admin" replace />
 }
 
@@ -27,6 +33,15 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
+      <Route path="/invite/:token" element={<Invite />} />
+      <Route
+        path="/onboarding"
+        element={
+          <RequireAuth>
+            <Onboarding />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/admin"
         element={
