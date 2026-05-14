@@ -41,11 +41,26 @@ export type PricingPlan = {
   updated_at: string
 }
 
+export type IntegrationPlatform = 'elevenlabs' | 'retellai' | 'vapi' | 'openai'
+export type IntegrationRegion = 'us' | 'eu'
+
+export type Integration = {
+  id: string
+  name: string
+  platform: IntegrationPlatform
+  region: IntegrationRegion | null
+  active: boolean
+  created_at: string
+  updated_at: string
+  // api_key + vapi_public_key are server-side only — not selected on the client
+}
+
 export type VoiceAgent = {
   id: string
   customer_id: string
-  elevenlabs_agent_id: string
-  elevenlabs_phone_number_id: string | null
+  integration_id: string
+  platform_agent_id: string
+  platform_phone_number_id: string | null
   display_name: string | null
   pricing_plan_id: string | null
   active: boolean

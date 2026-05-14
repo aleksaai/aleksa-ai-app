@@ -44,37 +44,41 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const customer_id = (body.customer_id ?? '').toString().trim()
-    const elevenlabs_agent_id = (body.elevenlabs_agent_id ?? '').toString().trim()
-    const elevenlabs_phone_number_id = body.elevenlabs_phone_number_id?.toString().trim() || null
+    const integration_id = (body.integration_id ?? '').toString().trim()
+    const platform_agent_id = (body.platform_agent_id ?? '').toString().trim()
+    const platform_phone_number_id = body.platform_phone_number_id?.toString().trim() || null
     const display_name = body.display_name?.toString().trim() || null
 
     if (!customer_id) return json({ error: 'customer_id_required' }, 400)
-    if (!elevenlabs_agent_id) return json({ error: 'elevenlabs_agent_id_required' }, 400)
+    if (!integration_id) return json({ error: 'integration_id_required' }, 400)
+    if (!platform_agent_id) return json({ error: 'platform_agent_id_required' }, 400)
 
-    // Verify customer exists
+    // Verify customer + integration exist
     const { data: customer } = await supabaseAdmin
-      .from('customers')
-      .select('id')
-      .eq('id', customer_id)
-      .maybeSingle()
+      .from('customers').select('id').eq('id', customer_id).maybeSingle()
     if (!customer) return json({ error: 'customer_not_found' }, 404)
+
+    const { data: integration } = await supabaseAdmin
+      .from('integrations').select('id, active').eq('id', integration_id).maybeSingle()
+    if (!integration) return json({ error: 'integration_not_found' }, 404)
+    if (!integration.active) return json({ error: 'integration_inactive' }, 400)
 
     // Insert voice_agent
     const { data: agent, error: agentErr } = await supabaseAdmin
       .from('voice_agents')
       .insert({
         customer_id,
-        elevenlabs_agent_id,
-        elevenlabs_phone_number_id,
+        integration_id,
+        platform_agent_id,
+        platform_phone_number_id,
         display_name,
         active: true,
       })
       .select()
       .single()
     if (agentErr) {
-      // Unique violation on elevenlabs_agent_id (already in DB for another customer)
       if (agentErr.code === '23505') {
-        return json({ error: 'agent_already_registered', detail: agentErr.message }, 409)
+        return json({ error: 'agent_already_registered', detail: 'dieser Agent ist bereits in dieser Integration registriert' }, 409)
       }
       return json({ error: 'agent_insert_failed', detail: agentErr.message }, 500)
     }

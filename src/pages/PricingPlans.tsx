@@ -72,18 +72,9 @@ export function PricingPlans() {
               AleksaAI Admin
             </Link>
             <nav className="flex gap-1">
-              <Link
-                to="/admin"
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-              >
-                Kunden
-              </Link>
-              <Link
-                to="/admin/pricing-plans"
-                className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900"
-              >
-                Pricing-Pakete
-              </Link>
+              <Link to="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Kunden</Link>
+              <Link to="/admin/integrations" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Integrationen</Link>
+              <Link to="/admin/pricing-plans" className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900">Pricing-Pakete</Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">

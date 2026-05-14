@@ -141,13 +141,29 @@ export async function adminCreatePricingPlan(
   return data
 }
 
+// ─── admin-create-integration ──────────────────────────────────
+
+export type CreateIntegrationInput =
+  | { platform: 'elevenlabs'; name: string; api_key: string; region: 'us' | 'eu' }
+  | { platform: 'retellai'; name: string; api_key: string }
+  | { platform: 'vapi'; name: string; api_key: string; vapi_public_key: string }
+  | { platform: 'openai'; name: string; api_key: string }
+
+export async function adminCreateIntegration(input: CreateIntegrationInput) {
+  const { data, error } = await supabase.functions.invoke('admin-create-integration', { body: input })
+  if (error) throw new Error(error.message)
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data as { ok: true; integration: { id: string; name: string; platform: string; region: string | null } }
+}
+
 // ─── admin-create-voice-agent ──────────────────────────────────
 
 export type CreateVoiceAgentInput = {
   customer_id: string
-  elevenlabs_agent_id: string
+  integration_id: string
+  platform_agent_id: string
   display_name?: string
-  elevenlabs_phone_number_id?: string
+  platform_phone_number_id?: string
 }
 
 export async function adminCreateVoiceAgent(input: CreateVoiceAgentInput) {

@@ -3,12 +3,13 @@ import { Link, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
-import type { Customer, VoiceAgent, PricingPlan } from '../types/db'
+import type { Customer, VoiceAgent, PricingPlan, Integration } from '../types/db'
 import { AddVoiceAgentDialog } from '../components/AddVoiceAgentDialog'
 import { AssignPricingDialog } from '../components/AssignPricingDialog'
 
 type AgentRow = VoiceAgent & {
   pricing_plans: PricingPlan | null
+  integrations: Pick<Integration, 'name' | 'platform' | 'region'> | null
   customer_subscriptions: { id: string; status: string; stripe_subscription_id: string }[]
 }
 
@@ -28,7 +29,7 @@ export function CustomerDetail() {
     setCustomer(c as Customer | null)
     const { data: a } = await supabase
       .from('voice_agents')
-      .select('*, pricing_plans(*), customer_subscriptions(id, status, stripe_subscription_id)')
+      .select('*, pricing_plans(*), integrations(name, platform, region), customer_subscriptions(id, status, stripe_subscription_id)')
       .eq('customer_id', id)
       .order('created_at', { ascending: false })
     setAgents((a ?? []) as AgentRow[])
@@ -47,6 +48,7 @@ export function CustomerDetail() {
             <Link to="/admin" className="text-lg font-semibold">AleksaAI Admin</Link>
             <nav className="flex gap-1">
               <Link to="/admin" className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900">Kunden</Link>
+              <Link to="/admin/integrations" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Integrationen</Link>
               <Link to="/admin/pricing-plans" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Pricing-Pakete</Link>
             </nav>
           </div>
@@ -126,13 +128,23 @@ export function CustomerDetail() {
                         <div className="flex items-start justify-between">
                           <div>
                             <h3 className="text-base font-semibold">
-                              {a.display_name ?? a.elevenlabs_agent_id}
+                              {a.display_name ?? a.platform_agent_id}
                             </h3>
+                            {a.integrations && (
+                              <p className="mt-1 text-xs text-slate-500">
+                                via{' '}
+                                <span className="font-medium text-slate-700">
+                                  {a.integrations.name}
+                                </span>
+                                {' '}({a.integrations.platform}
+                                {a.integrations.region ? `, ${a.integrations.region.toUpperCase()}` : ''})
+                              </p>
+                            )}
                             <p className="mt-1 font-mono text-xs text-slate-500">
-                              {a.elevenlabs_agent_id}
+                              {a.platform_agent_id}
                             </p>
-                            {a.elevenlabs_phone_number_id && (
-                              <p className="font-mono text-xs text-slate-500">📞 {a.elevenlabs_phone_number_id}</p>
+                            {a.platform_phone_number_id && (
+                              <p className="font-mono text-xs text-slate-500">📞 {a.platform_phone_number_id}</p>
                             )}
                           </div>
                           <div className="text-right">
