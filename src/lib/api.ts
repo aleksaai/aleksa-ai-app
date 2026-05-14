@@ -16,6 +16,7 @@ export type CreateCustomerResult = {
   invitation_token: string
   invite_link: string
   email_sent: boolean
+  email_error?: string | null
 }
 
 export async function adminCreateCustomer(

@@ -102,8 +102,9 @@ Deno.serve(async (req) => {
     })
     if (invErr) return json({ error: 'invitation_insert_failed', detail: invErr.message }, 500)
 
-    // ── 6. Email via Resend (non-fatal if it fails) ──
+    // ── 6. Email via Resend (non-fatal if it fails — but return detail to admin) ──
     let emailSent = false
+    let emailError: string | null = null
     try {
       const resend = new Resend(RESEND_API_KEY)
       const inviteLink = `${APP_URL}/invite/${token}`
@@ -132,10 +133,16 @@ Deno.serve(async (req) => {
           </div>
         `,
       })
-      emailSent = !r.error
-    } catch (_e) {
-      // Email-Failure ist non-fatal — Admin sieht den Invite-Link in der Response und kann manuell teilen
-      emailSent = false
+      if (r.error) {
+        emailError = `${r.error.name || 'ResendError'}: ${r.error.message || JSON.stringify(r.error)}`
+        console.error('Resend returned error:', JSON.stringify(r.error))
+      } else {
+        emailSent = true
+        console.log('Resend send OK, id:', r.data?.id)
+      }
+    } catch (e) {
+      emailError = `Exception: ${e instanceof Error ? e.message : String(e)}`
+      console.error('Resend exception:', emailError)
     }
 
     return json({
@@ -145,6 +152,7 @@ Deno.serve(async (req) => {
       invitation_token: token,
       invite_link: `${APP_URL}/invite/${token}`,
       email_sent: emailSent,
+      email_error: emailError,
     })
   } catch (e) {
     return json({ error: 'unexpected', detail: String(e) }, 500)

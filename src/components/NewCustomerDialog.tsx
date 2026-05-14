@@ -170,6 +170,13 @@ export function NewCustomerDialog({ open, onClose, onCreated }: Props) {
                     </button>
                   </div>
 
+                  {result?.email_error && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
+                      <p className="mb-1 font-medium text-amber-900">Resend-Fehler:</p>
+                      <p className="break-words font-mono text-amber-800">{result.email_error}</p>
+                    </div>
+                  )}
+
                   <div className="text-xs text-slate-500">
                     Stripe Customer-ID: <code>{result?.stripe_customer_id}</code>
                   </div>
