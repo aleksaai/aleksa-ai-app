@@ -156,6 +156,22 @@ export async function adminCreateIntegration(input: CreateIntegrationInput) {
   return data as { ok: true; integration: { id: string; name: string; platform: string; region: string | null } }
 }
 
+// ─── admin-list-platform-agents ─────────────────────────────────
+
+export type ListedPlatformAgent = {
+  platform_agent_id: string
+  name: string
+  platform_phone_number_id?: string
+  phone_number_e164?: string
+}
+
+export async function adminListPlatformAgents(integration_id: string) {
+  const { data, error } = await supabase.functions.invoke('admin-list-platform-agents', { body: { integration_id } })
+  if (error) throw new Error(error.message)
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data as { ok: true; agents: ListedPlatformAgent[]; integration: { id: string; name: string; platform: string; region: string | null } }
+}
+
 // ─── admin-create-voice-agent ──────────────────────────────────
 
 export type CreateVoiceAgentInput = {
