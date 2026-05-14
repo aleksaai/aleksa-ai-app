@@ -228,7 +228,20 @@ export type UpdateBusinessInput = {
 export async function updateCustomerBusiness(input: UpdateBusinessInput) {
   const { data, error } = await supabase.functions.invoke('update-customer-business', { body: input })
   if (error) {
-    // Supabase functions client folds non-2xx into error.message — bubble up so UI shows it
+    // supabase.functions.invoke on non-2xx returns error.message = generic
+    // "Edge Function returned a non-2xx status code". The real body is on
+    // error.context (a Response) — try to parse our {error, detail} from it.
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        const e = body?.error ?? 'unknown_error'
+        const d = body?.detail ?? ''
+        throw new Error(`${e}${d ? ': ' + d : ''}`)
+      }
+    } catch {
+      // fall through to generic
+    }
     throw new Error(error.message)
   }
   if (!data || !(data as any).ok) {
