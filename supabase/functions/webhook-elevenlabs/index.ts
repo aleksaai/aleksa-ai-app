@@ -79,9 +79,10 @@ Deno.serve(async (req) => {
   if (!signature) return json({ error: 'missing_signature' }, 400)
 
   const rawBody = await req.text()
-  const secret = Deno.env.get('ELEVENLABS_WEBHOOK_HMAC_SECRET')
+  const secret = Deno.env.get('ELEVENLABS_WEBHOOK_SECRET')
+    ?? Deno.env.get('ELEVENLABS_WEBHOOK_HMAC_SECRET')
   if (!secret) {
-    console.error('ELEVENLABS_WEBHOOK_HMAC_SECRET not configured')
+    console.error('ELEVENLABS_WEBHOOK_SECRET not configured')
     return json({ error: 'server_misconfigured' }, 500)
   }
 
