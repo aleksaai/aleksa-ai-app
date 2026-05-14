@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { loadStripe, type Stripe } from '@stripe/stripe-js'
-import { Elements, useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js'
+import { Elements, useStripe, useElements, PaymentElement, AddressElement } from '@stripe/react-stripe-js'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { getSetupIntent, linkInvitation } from '../lib/api'
@@ -112,6 +112,8 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
       elements,
       confirmParams: {
         return_url: `${window.location.origin}/dashboard`,
+        // Persist the billing address on the customer so Stripe Tax works
+        // when we later create the Subscription with automatic_tax enabled.
       },
       redirect: 'if_required',
     })
@@ -138,7 +140,18 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
         </p>
       </div>
 
-      <PaymentElement />
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">Rechnungsadresse</label>
+        <AddressElement options={{ mode: 'billing' }} />
+        <p className="mt-1 text-xs text-slate-500">
+          Wird für VAT-Berechnung gebraucht (Stripe Tax). Wird nicht weitergegeben.
+        </p>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">Zahlungsmethode</label>
+        <PaymentElement />
+      </div>
 
       {errMsg && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">

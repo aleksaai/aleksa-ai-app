@@ -53,11 +53,34 @@ Deno.serve(async (req) => {
       case 'setup_intent.succeeded': {
         const setupIntent = event.data.object as Stripe.SetupIntent
         const customerId = setupIntent.customer as string
+        const paymentMethodId = setupIntent.payment_method as string | null
         if (!customerId) break
+
+        // 1. Mark customer as having a payment method in our DB
         await supabaseAdmin
           .from('customers')
           .update({ has_payment_method: true })
           .eq('stripe_customer_id', customerId)
+
+        // 2. Set the payment method as the customer's default for invoices.
+        //    Without this, future subscription.create calls fail with
+        //    'no attached payment source or default payment method'.
+        if (paymentMethodId) {
+          try {
+            await fetch(`https://api.stripe.com/v1/customers/${customerId}`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${Deno.env.get('STRIPE_SECRET_KEY')!}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                'invoice_settings[default_payment_method]': paymentMethodId,
+              }),
+            })
+          } catch (e) {
+            console.error('Failed to set default payment method:', e)
+          }
+        }
         break
       }
 

@@ -26,6 +26,13 @@ function summary(p: PricingPlan): string {
   return p.type
 }
 
+function typeBadge(type: string): { label: string; cls: string } {
+  if (type === 'hybrid') return { label: 'Grundabo + Nutzung', cls: 'bg-slate-100 text-slate-700' }
+  if (type === 'per_minute') return { label: 'Pro Minute', cls: 'bg-slate-100 text-slate-700' }
+  if (type === 'one_time') return { label: 'Einmalig (sofort belastet)', cls: 'bg-amber-100 text-amber-800' }
+  return { label: type, cls: 'bg-slate-100 text-slate-700' }
+}
+
 export function AssignPricingDialog({ open, voiceAgentId, voiceAgentName, onClose, onAssigned }: Props) {
   const [plans, setPlans] = useState<PricingPlan[]>([])
   const [selected, setSelected] = useState<string>('')
@@ -38,7 +45,6 @@ export function AssignPricingDialog({ open, voiceAgentId, voiceAgentName, onClos
       .from('pricing_plans')
       .select('*')
       .eq('archived', false)
-      .in('type', ['hybrid', 'per_minute']) // one_time is not supported as recurring subscription
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         if (data) setPlans(data as PricingPlan[])
@@ -87,35 +93,45 @@ export function AssignPricingDialog({ open, voiceAgentId, voiceAgentName, onClos
 
                 {plans.length === 0 ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    Keine recurring Pricing-Pakete vorhanden. Leg zuerst eines unter <strong>Pricing-Pakete</strong> an.
+                    Keine Pricing-Pakete vorhanden. Leg zuerst eines unter <strong>Pricing-Pakete</strong> an.
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {plans.map((p) => (
-                      <label
-                        key={p.id}
-                        className={`flex cursor-pointer items-start rounded-lg border p-3 transition-colors ${
-                          selected === p.id ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="plan"
-                          checked={selected === p.id}
-                          onChange={() => setSelected(p.id)}
-                          className="mt-0.5"
-                        />
-                        <div className="ml-3 flex-1">
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm font-medium">{p.name}</div>
-                            <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-                              {p.type === 'hybrid' ? 'Grundabo + Nutzung' : 'Pro Minute'}
-                            </span>
+                    {plans.map((p) => {
+                      const badge = typeBadge(p.type)
+                      return (
+                        <label
+                          key={p.id}
+                          className={`flex cursor-pointer items-start rounded-lg border p-3 transition-colors ${
+                            selected === p.id ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="plan"
+                            checked={selected === p.id}
+                            onChange={() => setSelected(p.id)}
+                            className="mt-0.5"
+                          />
+                          <div className="ml-3 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm font-medium">{p.name}</div>
+                              <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs ${badge.cls}`}>
+                                {badge.label}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 text-xs text-slate-500">{summary(p)}</div>
                           </div>
-                          <div className="mt-0.5 text-xs text-slate-500">{summary(p)}</div>
-                        </div>
-                      </label>
-                    ))}
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {selected && plans.find((p) => p.id === selected)?.type === 'one_time' && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    ⚠️ Einmal-Charges werden <strong>sofort</strong> belastet (nicht am Periodenende).
+                    Stripe rechnet die Rechnung direkt über die hinterlegte Zahlungsmethode ab.
                   </div>
                 )}
 
@@ -130,7 +146,11 @@ export function AssignPricingDialog({ open, voiceAgentId, voiceAgentName, onClos
                     disabled={status === 'loading'}>Abbrechen</button>
                   <button type="submit" className="btn-primary flex-1"
                     disabled={status === 'loading' || !selected}>
-                    {status === 'loading' ? 'Starte…' : 'Subscription starten'}
+                    {status === 'loading'
+                      ? 'Starte…'
+                      : plans.find((p) => p.id === selected)?.type === 'one_time'
+                      ? 'Einmal-Charge auslösen'
+                      : 'Subscription starten'}
                   </button>
                 </div>
               </form>

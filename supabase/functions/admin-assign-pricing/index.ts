@@ -39,17 +39,6 @@ async function stripeForm(path: string, key: string, params: Record<string, stri
   return res.json()
 }
 
-async function stripeGet(path: string, key: string) {
-  const res = await fetch(`https://api.stripe.com/v1${path}`, {
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Stripe-Version': STRIPE_API_VERSION,
-    },
-  })
-  if (!res.ok) throw new Error(`Stripe GET ${path}: ${res.status} ${await res.text()}`)
-  return res.json()
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -104,10 +93,58 @@ Deno.serve(async (req) => {
       .eq('id', pricing_plan_id)
       .maybeSingle()
     if (!plan) return json({ error: 'plan_not_found' }, 404)
+
+    // ── One-Time: charge immediately via Invoice (no recurring subscription) ──
     if (plan.type === 'one_time') {
-      return json({ error: 'one_time_not_supported_as_subscription' }, 400)
+      // 1. Create invoice item
+      const itemRes = await stripeForm('/invoiceitems', STRIPE_SECRET_KEY, {
+        customer: customer.stripe_customer_id,
+        price: plan.stripe_flat_price_id!,
+        'metadata[source]': 'aleksa-ai-app',
+        'metadata[voice_agent_id]': voice_agent_id,
+        'metadata[pricing_plan_id]': pricing_plan_id,
+      })
+      // 2. Create + finalize + pay invoice
+      const invoiceRes = await stripeForm('/invoices', STRIPE_SECRET_KEY, {
+        customer: customer.stripe_customer_id,
+        collection_method: 'charge_automatically',
+        auto_advance: 'true',
+        'automatic_tax[enabled]': 'true',
+        'metadata[source]': 'aleksa-ai-app',
+        'metadata[voice_agent_id]': voice_agent_id,
+      })
+      // 3. Finalize (triggers automatic payment because collection_method=charge_automatically)
+      await stripeForm(`/invoices/${invoiceRes.id}/finalize`, STRIPE_SECRET_KEY, {})
+
+      // Persist as a customer_subscription row with status 'active' for record-keeping
+      // (we reuse the table even though there's no recurring sub — it tracks "this agent is paid for")
+      const { data: subRow } = await supabaseAdmin
+        .from('customer_subscriptions')
+        .insert({
+          customer_id: customer.id,
+          voice_agent_id,
+          pricing_plan_id,
+          stripe_subscription_id: invoiceRes.id, // store invoice_id in this column for one_time
+          stripe_subscription_item_id: null,
+          status: 'active',
+          current_period_start: new Date().toISOString(),
+          current_period_end: new Date().toISOString(),
+        })
+        .select()
+        .single()
+
+      await supabaseAdmin.from('voice_agents').update({ pricing_plan_id }).eq('id', voice_agent_id)
+
+      return json({
+        ok: true,
+        type: 'one_time',
+        customer_subscription: subRow,
+        stripe_invoice_id: invoiceRes.id,
+        stripe_invoice_item_id: itemRes.id,
+      })
     }
 
+    // ── Recurring: Stripe Subscription ──
     // Check there's no existing active subscription for this agent
     const { data: existing } = await supabaseAdmin
       .from('customer_subscriptions')
