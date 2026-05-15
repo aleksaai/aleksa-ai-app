@@ -235,16 +235,6 @@ export function AppShell({
 
 function Logo() {
   return (
-    <div
-      className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
-      style={{
-        background:
-          'linear-gradient(135deg, var(--accent-400) 0%, var(--accent-500) 50%, var(--accent-600) 100%)',
-        boxShadow:
-          '0 1px 0 0 rgba(255,255,255,0.5) inset, 0 6px 18px -6px rgba(var(--accent-shadow-rgb),0.55)',
-      }}
-    >
-      <img src="/logo-white.png" alt="AleksaAI" className="h-[85%] w-[85%] object-contain" />
-    </div>
+    <img src="/logo-color.png" alt="AleksaAI" className="h-11 w-11 shrink-0 object-contain" />
   )
 }
