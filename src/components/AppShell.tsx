@@ -244,7 +244,7 @@ function Logo() {
           '0 1px 0 0 rgba(255,255,255,0.5) inset, 0 6px 18px -6px rgba(var(--accent-shadow-rgb),0.55)',
       }}
     >
-      <img src="/logo-white.png" alt="AleksaAI" className="h-[72%] w-[72%] object-contain" />
+      <img src="/logo-white.png" alt="AleksaAI" className="h-[85%] w-[85%] object-contain" />
     </div>
   )
 }
