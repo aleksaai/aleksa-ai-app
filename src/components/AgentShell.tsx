@@ -250,19 +250,13 @@ export function AgentShell({
 function Logo() {
   return (
     <div
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
+      className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white"
       style={{
-        background:
-          'linear-gradient(135deg, var(--accent-400) 0%, var(--accent-500) 50%, var(--accent-600) 100%)',
         boxShadow:
-          '0 1px 0 0 rgba(255,255,255,0.5) inset, 0 6px 18px -6px rgba(var(--accent-shadow-rgb),0.55)',
+          '0 1px 0 0 rgba(255,255,255,0.5) inset, 0 6px 18px -6px rgba(var(--accent-shadow-rgb),0.35)',
       }}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
-      </svg>
+      <img src="/logo.png" alt="AleksaAI" className="h-full w-full object-contain" />
     </div>
   )
 }
