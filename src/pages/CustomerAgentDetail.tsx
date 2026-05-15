@@ -14,6 +14,7 @@ import {
   adminGetAgentConfig,
   adminUpdateAgentConfig,
   adminListVoices,
+  adminGetVoiceById,
   adminListKbDocs,
   adminCreateKbDoc,
   adminUpdateAgentKb,
@@ -89,6 +90,7 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
   const [ttsModel, setTtsModel] = useState<string>('')
   const [llmModel, setLlmModel] = useState<string>('')
   const [extraLanguages, setExtraLanguages] = useState<string[]>([])
+  const [customVoices, setCustomVoices] = useState<Voice[]>([])
 
   // KB
   const [workspaceKb, setWorkspaceKb] = useState<KBDoc[]>([])
@@ -190,6 +192,31 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
     loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, profile?.customer_id])
+
+  // Load custom voices (added by voice_id) from localStorage, scoped per agent
+  useEffect(() => {
+    if (!id) return
+    try {
+      const raw = localStorage.getItem(`customVoices:${id}`)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) setCustomVoices(parsed)
+      }
+    } catch { /* ignore */ }
+  }, [id])
+
+  const handleAddCustomVoice = async (voiceId: string): Promise<Voice> => {
+    if (!agent?.integrations?.id) throw new Error('Keine Integration verknüpft.')
+    const voice = await adminGetVoiceById(agent.integrations.id, voiceId.trim())
+    // Avoid duplicate (and avoid adding if already in workspace list)
+    if (customVoices.find((v) => v.voice_id === voice.voice_id)) return voice
+    const next = [voice, ...customVoices]
+    setCustomVoices(next)
+    if (id) {
+      try { localStorage.setItem(`customVoices:${id}`, JSON.stringify(next)) } catch { /* ignore */ }
+    }
+    return voice
+  }
 
   // Lazy-load voices and KB when their sections open
   useEffect(() => {
@@ -487,6 +514,8 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
             onPromptChange={setPrompt}
             voices={voices}
             voicesLoading={voicesLoading}
+            customVoices={customVoices}
+            onAddCustomVoice={handleAddCustomVoice}
             selectedVoice={selectedVoice}
             onVoiceChange={setSelectedVoice}
             currentVoiceId={config?.voice_id ?? null}
@@ -828,6 +857,8 @@ function ConfigView({
   onPromptChange,
   voices,
   voicesLoading,
+  customVoices,
+  onAddCustomVoice,
   selectedVoice,
   onVoiceChange,
   currentVoiceId,
@@ -846,6 +877,8 @@ function ConfigView({
   onPromptChange: (v: string) => void
   voices: Voice[]
   voicesLoading: boolean
+  customVoices: Voice[]
+  onAddCustomVoice: (voiceId: string) => Promise<Voice>
   selectedVoice: string
   onVoiceChange: (id: string) => void
   currentVoiceId: string | null
@@ -859,6 +892,26 @@ function ConfigView({
   onExtraLanguagesChange: (v: string[]) => void
 }) {
   const [tab, setTab] = useState<ConfigTab>('prompt')
+  const [addVoiceOpen, setAddVoiceOpen] = useState(false)
+  const [newVoiceId, setNewVoiceId] = useState('')
+  const [addingVoice, setAddingVoice] = useState(false)
+  const [addVoiceError, setAddVoiceError] = useState('')
+
+  const handleAddVoiceSubmit = async () => {
+    if (!newVoiceId.trim() || addingVoice) return
+    setAddingVoice(true)
+    setAddVoiceError('')
+    try {
+      const added = await onAddCustomVoice(newVoiceId.trim())
+      onVoiceChange(added.voice_id)
+      setNewVoiceId('')
+      setAddVoiceOpen(false)
+    } catch (e) {
+      setAddVoiceError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAddingVoice(false)
+    }
+  }
 
   // Effective voice = staged change OR currently saved
   const effectiveVoiceId = selectedVoice || currentVoiceId
@@ -945,89 +998,181 @@ function ConfigView({
 
           {/* ============ VOICE TAB ============ */}
           {tab === 'voice' && (
-            <div className="glass-card p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold tracking-tight">Stimme auswählen</h3>
-                  <p className="mt-0.5 text-xs text-ink-muted">
-                    Die Wahl der Stimme bestimmt auch welche Sprachen verfügbar sind.
-                  </p>
+            <div className="space-y-4">
+              {/* Add by Voice-ID */}
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold tracking-tight">Eigene Voice-ID hinzufügen</h3>
+                    <p className="mt-0.5 text-xs text-ink-muted">
+                      Hast du eine Voice-ID aus ElevenLabs? Hier eintragen und sie erscheint
+                      direkt in der Liste unten.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddVoiceOpen((v) => !v)
+                      setAddVoiceError('')
+                    }}
+                    className="btn-ghost text-sm"
+                  >
+                    {addVoiceOpen ? 'Abbrechen' : '+ Voice-ID'}
+                  </button>
                 </div>
-                {!voicesLoading && voices.length === 0 && (
-                  <span className="pill-neutral text-[10px]">Standard-Bibliothek</span>
-                )}
+                <AnimatePresence>
+                  {addVoiceOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                      animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newVoiceId}
+                          onChange={(e) => setNewVoiceId(e.target.value)}
+                          placeholder="z.B. v3V1d2rk6528UrLKRuy8"
+                          className="glass-input flex-1 font-mono text-xs"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleAddVoiceSubmit()
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={addingVoice || !newVoiceId.trim()}
+                          onClick={handleAddVoiceSubmit}
+                          className="btn-primary text-sm"
+                        >
+                          {addingVoice ? 'Suche…' : 'Suchen & Hinzufügen'}
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs text-ink-muted">
+                        Voice-IDs findest du in deinem ElevenLabs-Dashboard oder in der{' '}
+                        <a
+                          href="https://elevenlabs.io/app/voice-library"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline hover:[color:var(--accent-700)]"
+                        >
+                          Voice Library
+                        </a>
+                        .
+                      </p>
+                      {addVoiceError && (
+                        <div className="mt-2 rounded-xl border border-red-200 bg-red-50/80 p-3 text-xs text-red-700">
+                          {addVoiceError}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
-              {voicesLoading ? (
-                <p className="py-8 text-center text-sm text-ink-muted">Lade Stimmen…</p>
-              ) : (
-                <div className="scrollbar-thin max-h-[560px] space-y-2 overflow-y-auto pr-1">
-                  {(voices.length > 0 ? voices : CURATED_VOICES).map((v) => {
-                    const active = effectiveVoiceId === v.voice_id
-                    const curated = CURATED_VOICES.find((c) => c.voice_id === v.voice_id)
-                    return (
-                      <label
-                        key={v.voice_id}
-                        className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl p-3.5 transition-all ${
-                          active
-                            ? 'border border-brand-400/60 bg-brand-50/60 shadow-sm'
-                            : 'border border-white/40 bg-white/40 hover:bg-white/70'
-                        }`}
-                      >
-                        <div className="flex min-w-0 items-start gap-3">
-                          <div
-                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                              active ? 'bg-brand-400 text-white' : 'bg-white/70 text-brand-700'
+              {/* Voice picker */}
+              <div className="glass-card p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold tracking-tight">Stimme auswählen</h3>
+                    <p className="mt-0.5 text-xs text-ink-muted">
+                      Die Wahl der Stimme bestimmt auch, welche Sprachen verfügbar sind.
+                    </p>
+                  </div>
+                  {!voicesLoading && voices.length === 0 && (
+                    <span className="pill-neutral text-[10px]">Standard-Bibliothek</span>
+                  )}
+                </div>
+
+                {voicesLoading ? (
+                  <p className="py-8 text-center text-sm text-ink-muted">Lade Stimmen…</p>
+                ) : (
+                  <div className="scrollbar-thin max-h-[560px] space-y-2 overflow-y-auto pr-1">
+                    {/* Order: customVoices first (newest user adds), then workspace OR curated */}
+                    {[
+                      ...customVoices,
+                      ...(voices.length > 0 ? voices : CURATED_VOICES),
+                    ]
+                      // Dedupe by voice_id
+                      .filter(
+                        (v, i, arr) => arr.findIndex((x) => x.voice_id === v.voice_id) === i,
+                      )
+                      .map((v) => {
+                        const active = effectiveVoiceId === v.voice_id
+                        const curated = CURATED_VOICES.find((c) => c.voice_id === v.voice_id)
+                        const isCustom = customVoices.some((c) => c.voice_id === v.voice_id)
+                        return (
+                          <label
+                            key={v.voice_id}
+                            className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl p-3.5 transition-all ${
+                              active
+                                ? 'border border-brand-400/60 bg-brand-50/60 shadow-sm'
+                                : 'border border-white/40 bg-white/40 hover:bg-white/70'
                             }`}
                           >
-                            <WaveIcon />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium tracking-tight">{v.name}</p>
-                            {curated?.short_description && (
-                              <p className="mt-0.5 text-xs text-ink-muted">{curated.short_description}</p>
-                            )}
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {Object.entries(v.labels)
-                                .slice(0, 3)
-                                .map(([k, val]) => (
-                                  <span key={k} className="pill-neutral text-[10px]">
-                                    {val}
-                                  </span>
-                                ))}
-                              {curated?.optimal_languages && (
-                                <span className="pill-brand text-[10px]">
-                                  <GlobeMiniIcon />
-                                  {curated.optimal_languages.length === 1
-                                    ? `Optimal für ${languageName(curated.optimal_languages[0])}`
-                                    : `${curated.optimal_languages.length} Sprachen`}
-                                </span>
-                              )}
+                            <div className="flex min-w-0 items-start gap-3">
+                              <div
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                  active ? 'bg-brand-400 text-white' : 'bg-white/70 text-brand-700'
+                                }`}
+                              >
+                                <WaveIcon />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium tracking-tight">{v.name}</p>
+                                  {isCustom && (
+                                    <span className="pill-brand text-[10px]">Eigene</span>
+                                  )}
+                                </div>
+                                {curated?.short_description && (
+                                  <p className="mt-0.5 text-xs text-ink-muted">{curated.short_description}</p>
+                                )}
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {Object.entries(v.labels)
+                                    .slice(0, 3)
+                                    .map(([k, val]) => (
+                                      <span key={k} className="pill-neutral text-[10px]">
+                                        {val}
+                                      </span>
+                                    ))}
+                                  {curated?.optimal_languages && (
+                                    <span className="pill-brand text-[10px]">
+                                      <GlobeMiniIcon />
+                                      {curated.optimal_languages.length === 1
+                                        ? `Optimal für ${languageName(curated.optimal_languages[0])}`
+                                        : `${curated.optimal_languages.length} Sprachen`}
+                                    </span>
+                                  )}
+                                </div>
+                                {curated?.optimal_languages && curated.optimal_languages.length > 1 && (
+                                  <p className="mt-1 text-[11px] text-ink-muted">
+                                    {curated.optimal_languages.map(languageName).join(' · ')}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            {curated?.optimal_languages && curated.optimal_languages.length > 1 && (
-                              <p className="mt-1 text-[11px] text-ink-muted">
-                                {curated.optimal_languages.map(languageName).join(' · ')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {v.preview_url && (
-                            <audio src={v.preview_url} controls preload="none" className="h-8 max-w-[160px]" />
-                          )}
-                          <input
-                            type="radio"
-                            name="voice"
-                            checked={active}
-                            onChange={() => onVoiceChange(v.voice_id)}
-                            className="accent-brand-500"
-                          />
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
+                            <div className="flex items-center gap-3">
+                              {v.preview_url && (
+                                <audio src={v.preview_url} controls preload="none" className="h-8 max-w-[160px]" />
+                              )}
+                              <input
+                                type="radio"
+                                name="voice"
+                                checked={active}
+                                onChange={() => onVoiceChange(v.voice_id)}
+                                className="accent-brand-500"
+                              />
+                            </div>
+                          </label>
+                        )
+                      })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

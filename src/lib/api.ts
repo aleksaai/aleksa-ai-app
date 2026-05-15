@@ -317,6 +317,27 @@ export async function adminListVoices(integration_id: string): Promise<Voice[]> 
   return data.voices
 }
 
+// ─── admin-get-voice ──────────────────────────────────────────
+// Fetches a single voice by ID from ElevenLabs.
+// Works for both workspace voices and shared/premade library voices.
+export async function adminGetVoiceById(integration_id: string, voice_id: string): Promise<Voice> {
+  const { data, error } = await supabase.functions.invoke<{ ok: true; voice: Voice }>('admin-get-voice', {
+    body: { integration_id, voice_id },
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data.voice
+}
+
 // ─── Knowledge Base ─────────────────────────────────────────────
 
 export type KBDoc = {
