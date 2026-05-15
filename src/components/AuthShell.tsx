@@ -29,7 +29,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
                 '0 1px 0 0 rgba(255,255,255,0.5) inset, 0 12px 32px -8px rgba(var(--accent-shadow-rgb),0.55)',
             }}
           >
-            <img src="/logo-white.png" alt="AleksaAI" className="h-2/3 w-2/3 object-contain" />
+            <img src="/logo-white.png" alt="AleksaAI" className="h-[72%] w-[72%] object-contain" />
           </div>
           <p className="text-sm font-semibold tracking-tight text-ink">AleksaAI</p>
         </div>
