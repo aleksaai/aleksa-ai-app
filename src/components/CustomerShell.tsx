@@ -27,7 +27,7 @@ export function CustomerShell({
   const { user, signOut } = useAuth()
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
+    <div className="relative min-h-screen overflow-x-clip">
       {/* Ambient background */}
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="glow-orb-1" />

@@ -31,8 +31,8 @@ import {
 import { AgentShell, type AgentSection } from '../components/AgentShell'
 import { MiniLineChart } from '../components/MiniLineChart'
 import { CallDetailContent } from '../components/CallDetailContent'
-import { CURATED_VOICES } from '../lib/curatedVoices'
-import { LANGUAGES, TTS_MODELS, LLM_MODELS } from '../lib/agentOptions'
+import { CURATED_VOICES, optimalLanguagesForVoice } from '../lib/curatedVoices'
+import { LANGUAGES, TTS_MODELS, LLM_MODELS, languageName } from '../lib/agentOptions'
 
 type AgentRow = VoiceAgent & {
   customers: Pick<Customer, 'id' | 'name'> | null
@@ -819,6 +819,8 @@ function CallsView({
   )
 }
 
+type ConfigTab = 'prompt' | 'voice' | 'language' | 'models'
+
 function ConfigView({
   firstMessage,
   onFirstMessageChange,
@@ -856,8 +858,20 @@ function ConfigView({
   extraLanguages: string[]
   onExtraLanguagesChange: (v: string[]) => void
 }) {
+  const [tab, setTab] = useState<ConfigTab>('prompt')
+
+  // Effective voice = staged change OR currently saved
+  const effectiveVoiceId = selectedVoice || currentVoiceId
+
+  // Filter language list to voice's optimal_languages.
+  // If voice not in curated list (e.g. workspace voice), allow all languages.
+  const allowedLangCodes = optimalLanguagesForVoice(effectiveVoiceId)
+  const availableLanguages = allowedLangCodes
+    ? LANGUAGES.filter((l) => allowedLangCodes.includes(l.code))
+    : LANGUAGES
+
   const toggleExtraLang = (code: string) => {
-    if (code === language) return // can't be primary AND extra
+    if (code === language) return
     if (extraLanguages.includes(code)) {
       onExtraLanguagesChange(extraLanguages.filter((c) => c !== code))
     } else {
@@ -865,195 +879,292 @@ function ConfigView({
     }
   }
 
+  const SUB_TABS: { key: ConfigTab; label: string }[] = [
+    { key: 'prompt', label: 'Prompt' },
+    { key: 'voice', label: 'Stimme' },
+    { key: 'language', label: 'Sprache' },
+    { key: 'models', label: 'Modelle' },
+  ]
+
   return (
-    <div className="space-y-4">
-      {/* Sprache + Modelle */}
-      <div className="glass-card p-6 space-y-5">
-        <div>
-          <label className="label-soft mb-2 block">Primärsprache</label>
-          <select
-            value={language}
-            onChange={(e) => onLanguageChange(e.target.value)}
-            className="glass-input cursor-pointer"
-          >
-            <option value="" disabled>— wählen —</option>
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1.5 text-xs text-ink-muted">
-            Die Hauptsprache, in der der Agent spricht und versteht.
-          </p>
-        </div>
-
-        <div>
-          <label className="label-soft mb-2 block">Zusätzliche Sprachen</label>
-          <div className="flex flex-wrap gap-1.5">
-            {LANGUAGES.filter((l) => l.code !== language).map((l) => {
-              const active = extraLanguages.includes(l.code)
-              return (
-                <button
-                  key={l.code}
-                  type="button"
-                  onClick={() => toggleExtraLang(l.code)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${active ? 'shadow-sm' : ''}`}
-                  style={
-                    active
-                      ? {
-                          background:
-                            'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.25) 0%, rgba(var(--accent-400-rgb), 0.12) 100%)',
-                          color: 'var(--accent-800)',
-                          border: '1px solid rgba(var(--accent-400-rgb), 0.4)',
-                        }
-                      : {
-                          background: 'rgba(255,255,255,0.5)',
-                          color: '#6c6880',
-                          border: '1px solid rgba(255,255,255,0.6)',
-                        }
-                  }
-                >
-                  {l.name}
-                </button>
-              )
-            })}
-          </div>
-          <p className="mt-2 text-xs text-ink-muted">
-            Sprachen, in die der Agent während eines Gesprächs automatisch wechseln kann.
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label-soft mb-2 block">TTS-Modell (Stimme)</label>
-            <select
-              value={ttsModel}
-              onChange={(e) => onTtsModelChange(e.target.value)}
-              className="glass-input cursor-pointer"
+    <div className="space-y-5">
+      {/* Sub-tab switcher */}
+      <div className="flex justify-center">
+        <div className="tab-pill-group">
+          {SUB_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={`tab-pill ${tab === t.key ? 'tab-pill-active' : ''}`}
             >
-              <option value="" disabled>— wählen —</option>
-              {TTS_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1.5 text-xs text-ink-muted">
-              {TTS_MODELS.find((m) => m.id === ttsModel)?.description ?? 'Bestimmt Latenz und Qualität der Stimme.'}
-            </p>
-          </div>
-          <div>
-            <label className="label-soft mb-2 block">LLM-Modell (Gehirn)</label>
-            <select
-              value={llmModel}
-              onChange={(e) => onLlmModelChange(e.target.value)}
-              className="glass-input cursor-pointer"
-            >
-              <option value="" disabled>— wählen —</option>
-              {LLM_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1.5 text-xs text-ink-muted">
-              {LLM_MODELS.find((m) => m.id === llmModel)?.description ?? 'Bestimmt, wie der Agent versteht und antwortet.'}
-            </p>
-          </div>
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="glass-card p-6">
-        <label className="label-soft mb-2 block">Begrüßung</label>
-        <textarea
-          value={firstMessage}
-          onChange={(e) => onFirstMessageChange(e.target.value)}
-          rows={2}
-          className="glass-input"
-        />
-        <p className="mt-1.5 text-xs text-ink-muted">
-          Was der Agent als erstes sagt, wenn jemand anruft.
-        </p>
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
+        >
+          {/* ============ PROMPT TAB ============ */}
+          {tab === 'prompt' && (
+            <div className="space-y-4">
+              <div className="glass-card p-6">
+                <label className="label-soft mb-2 block">Begrüßung</label>
+                <textarea
+                  value={firstMessage}
+                  onChange={(e) => onFirstMessageChange(e.target.value)}
+                  rows={2}
+                  className="glass-input"
+                />
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  Was der Agent als erstes sagt, wenn jemand anruft.
+                </p>
+              </div>
 
-      <div className="glass-card p-6">
-        <label className="label-soft mb-2 block">System-Prompt</label>
-        <textarea
-          value={prompt}
-          onChange={(e) => onPromptChange(e.target.value)}
-          rows={18}
-          className="glass-input font-mono text-xs leading-relaxed"
-        />
-        <p className="mt-1.5 text-xs text-ink-muted">
-          Verhalten, Persönlichkeit und Regeln des Agenten.
-        </p>
-      </div>
-
-      <div className="glass-card p-6">
-        <div className="mb-3 flex items-center justify-between">
-          <label className="label-soft">Stimme</label>
-          {!voicesLoading && voices.length === 0 && (
-            <span className="pill-neutral text-[10px]">Standard-Bibliothek</span>
+              <div className="glass-card p-6">
+                <label className="label-soft mb-2 block">System-Prompt</label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => onPromptChange(e.target.value)}
+                  rows={20}
+                  className="glass-input font-mono text-xs leading-relaxed"
+                />
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  Verhalten, Persönlichkeit und Regeln des Agenten.
+                </p>
+              </div>
+            </div>
           )}
-        </div>
-        {voicesLoading ? (
-          <p className="py-4 text-center text-sm text-ink-muted">Lade Stimmen…</p>
-        ) : (
-          <div className="scrollbar-thin max-h-[440px] space-y-2 overflow-y-auto pr-1">
-            {(voices.length > 0 ? voices : CURATED_VOICES).map((v) => {
-              const active = (selectedVoice || currentVoiceId) === v.voice_id
-              return (
-                <label
-                  key={v.voice_id}
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl p-3 transition-all ${
-                    active
-                      ? 'border border-brand-400/60 bg-brand-50/60 shadow-sm'
-                      : 'border border-white/40 bg-white/40 hover:bg-white/70'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                        active ? 'bg-brand-400 text-white' : 'bg-white/70 text-brand-700'
-                      }`}
-                    >
-                      <WaveIcon />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium tracking-tight">{v.name}</p>
-                      {Object.entries(v.labels).length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {Object.entries(v.labels)
-                            .slice(0, 3)
-                            .map(([k, val]) => (
-                              <span key={k} className="pill-neutral text-[10px]">
-                                {val}
-                              </span>
-                            ))}
+
+          {/* ============ VOICE TAB ============ */}
+          {tab === 'voice' && (
+            <div className="glass-card p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold tracking-tight">Stimme auswählen</h3>
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    Die Wahl der Stimme bestimmt auch welche Sprachen verfügbar sind.
+                  </p>
+                </div>
+                {!voicesLoading && voices.length === 0 && (
+                  <span className="pill-neutral text-[10px]">Standard-Bibliothek</span>
+                )}
+              </div>
+
+              {voicesLoading ? (
+                <p className="py-8 text-center text-sm text-ink-muted">Lade Stimmen…</p>
+              ) : (
+                <div className="scrollbar-thin max-h-[560px] space-y-2 overflow-y-auto pr-1">
+                  {(voices.length > 0 ? voices : CURATED_VOICES).map((v) => {
+                    const active = effectiveVoiceId === v.voice_id
+                    const curated = CURATED_VOICES.find((c) => c.voice_id === v.voice_id)
+                    return (
+                      <label
+                        key={v.voice_id}
+                        className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl p-3.5 transition-all ${
+                          active
+                            ? 'border border-brand-400/60 bg-brand-50/60 shadow-sm'
+                            : 'border border-white/40 bg-white/40 hover:bg-white/70'
+                        }`}
+                      >
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                              active ? 'bg-brand-400 text-white' : 'bg-white/70 text-brand-700'
+                            }`}
+                          >
+                            <WaveIcon />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium tracking-tight">{v.name}</p>
+                            {curated?.short_description && (
+                              <p className="mt-0.5 text-xs text-ink-muted">{curated.short_description}</p>
+                            )}
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {Object.entries(v.labels)
+                                .slice(0, 3)
+                                .map(([k, val]) => (
+                                  <span key={k} className="pill-neutral text-[10px]">
+                                    {val}
+                                  </span>
+                                ))}
+                              {curated?.optimal_languages && (
+                                <span className="pill-brand text-[10px]">
+                                  <GlobeMiniIcon />
+                                  {curated.optimal_languages.length === 1
+                                    ? `Optimal für ${languageName(curated.optimal_languages[0])}`
+                                    : `${curated.optimal_languages.length} Sprachen`}
+                                </span>
+                              )}
+                            </div>
+                            {curated?.optimal_languages && curated.optimal_languages.length > 1 && (
+                              <p className="mt-1 text-[11px] text-ink-muted">
+                                {curated.optimal_languages.map(languageName).join(' · ')}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      )}
+                        <div className="flex items-center gap-3">
+                          {v.preview_url && (
+                            <audio src={v.preview_url} controls preload="none" className="h-8 max-w-[160px]" />
+                          )}
+                          <input
+                            type="radio"
+                            name="voice"
+                            checked={active}
+                            onChange={() => onVoiceChange(v.voice_id)}
+                            className="accent-brand-500"
+                          />
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============ LANGUAGE TAB ============ */}
+          {tab === 'language' && (
+            <div className="space-y-4">
+              {allowedLangCodes && (
+                <div className="rounded-xl border border-brand-200/50 bg-brand-50/40 p-3 text-xs text-ink-soft">
+                  <strong>Hinweis:</strong> Die ausgewählte Stimme ist optimiert für{' '}
+                  <strong>{availableLanguages.map((l) => l.name).join(', ')}</strong>. Andere Sprachen
+                  werden ausgeblendet — wechsle die Stimme oben, um mehr Optionen zu bekommen.
+                </div>
+              )}
+
+              <div className="glass-card p-6">
+                <label className="label-soft mb-2 block">Primärsprache</label>
+                <select
+                  value={availableLanguages.find((l) => l.code === language) ? language : ''}
+                  onChange={(e) => onLanguageChange(e.target.value)}
+                  className="glass-input cursor-pointer"
+                >
+                  <option value="" disabled>— wählen —</option>
+                  {availableLanguages.map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  Die Hauptsprache, in der der Agent spricht und versteht.
+                </p>
+              </div>
+
+              <div className="glass-card p-6">
+                <label className="label-soft mb-2 block">Zusätzliche Sprachen</label>
+                {availableLanguages.length === 1 ? (
+                  <p className="text-xs text-ink-muted">
+                    Die aktuell ausgewählte Stimme unterstützt nur eine Sprache.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableLanguages
+                        .filter((l) => l.code !== language)
+                        .map((l) => {
+                          const active = extraLanguages.includes(l.code)
+                          return (
+                            <button
+                              key={l.code}
+                              type="button"
+                              onClick={() => toggleExtraLang(l.code)}
+                              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${active ? 'shadow-sm' : ''}`}
+                              style={
+                                active
+                                  ? {
+                                      background:
+                                        'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.25) 0%, rgba(var(--accent-400-rgb), 0.12) 100%)',
+                                      color: 'var(--accent-800)',
+                                      border: '1px solid rgba(var(--accent-400-rgb), 0.4)',
+                                    }
+                                  : {
+                                      background: 'rgba(255,255,255,0.5)',
+                                      color: '#6c6880',
+                                      border: '1px solid rgba(255,255,255,0.6)',
+                                    }
+                              }
+                            >
+                              {l.name}
+                            </button>
+                          )
+                        })}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {v.preview_url && (
-                      <audio src={v.preview_url} controls preload="none" className="h-8 max-w-[180px]" />
-                    )}
-                    <input
-                      type="radio"
-                      name="voice"
-                      checked={active}
-                      onChange={() => onVoiceChange(v.voice_id)}
-                      className="accent-brand-500"
-                    />
-                  </div>
-                </label>
-              )
-            })}
-          </div>
-        )}
-      </div>
+                    <p className="mt-2 text-xs text-ink-muted">
+                      Sprachen, in die der Agent während eines Gesprächs automatisch wechseln kann.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ============ MODELS TAB ============ */}
+          {tab === 'models' && (
+            <div className="space-y-4">
+              <div className="glass-card p-6">
+                <label className="label-soft mb-2 block">TTS-Modell (Stimm-Engine)</label>
+                <select
+                  value={ttsModel}
+                  onChange={(e) => onTtsModelChange(e.target.value)}
+                  className="glass-input cursor-pointer"
+                >
+                  <option value="" disabled>— wählen —</option>
+                  {TTS_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  {TTS_MODELS.find((m) => m.id === ttsModel)?.description ??
+                    'Bestimmt Latenz und Qualität der Sprachausgabe.'}
+                </p>
+              </div>
+
+              <div className="glass-card p-6">
+                <label className="label-soft mb-2 block">LLM-Modell (Gehirn)</label>
+                <select
+                  value={llmModel}
+                  onChange={(e) => onLlmModelChange(e.target.value)}
+                  className="glass-input cursor-pointer"
+                >
+                  <option value="" disabled>— wählen —</option>
+                  {LLM_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  {LLM_MODELS.find((m) => m.id === llmModel)?.description ??
+                    'Bestimmt wie der Agent versteht und antwortet.'}
+                </p>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
+  )
+}
+
+function GlobeMiniIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20" />
+    </svg>
   )
 }
 

@@ -40,7 +40,7 @@ export function AgentShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
+    <div className="relative min-h-screen overflow-x-clip">
       {/* Ambient */}
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="glow-orb-1" />
