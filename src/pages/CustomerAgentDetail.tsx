@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
@@ -30,6 +30,8 @@ import {
 } from '../lib/billing'
 import { AgentShell, type AgentSection } from '../components/AgentShell'
 import { MiniLineChart } from '../components/MiniLineChart'
+import { CallDetailContent } from '../components/CallDetailContent'
+import { CURATED_VOICES } from '../lib/curatedVoices'
 
 type AgentRow = VoiceAgent & {
   customers: Pick<Customer, 'id' | 'name'> | null
@@ -58,8 +60,11 @@ type Props = {
 }
 
 export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props = {}) {
-  const params = useParams<{ id: string }>()
+  const params = useParams<{ id?: string }>()
   const id = agentIdOverride ?? params.id
+  const location = useLocation()
+  const callIdMatch = location.pathname.match(/\/calls\/([^/?#]+)/)
+  const callId = callIdMatch ? callIdMatch[1] : null
   const navigate = useNavigate()
   const { profile } = useAuth()
 
@@ -226,6 +231,24 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
     }
   }, [sections, activeSection])
 
+  // If URL has callId, force section to 'calls' so the sidebar reflects context
+  useEffect(() => {
+    if (callId && activeSection !== 'calls') setActiveSection('calls')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callId])
+
+  // Sidebar nav click handler — when leaving 'calls' while a call is open,
+  // strip the callId from the URL.
+  const handleChangeSection = (key: string) => {
+    setActiveSection(key)
+    if (callId) {
+      // Clear callId from URL by navigating to the agent root
+      navigate(isAdminPreview && agent?.customers
+        ? `/admin/customers/${agent.customers.id}/agents/${id}`
+        : `/dashboard/agents/${id}`)
+    }
+  }
+
   // ============ SAVE HANDLERS (config + kb) ============
   const configChanged =
     config !== null &&
@@ -370,34 +393,40 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
     <AgentShell
       sections={sections}
       activeKey={activeSection}
-      onChangeSection={setActiveSection}
+      onChangeSection={handleChangeSection}
       backTo={backTo}
       backLabel="Zurück zu Agenten"
       customerName={customerName ?? agent.display_name ?? 'Agent'}
       adminPreview={isAdminPreview}
       onExitPreview={() => navigate(backTo)}
-      pageTitle={sectionLabel}
+      pageTitle={callId ? 'Anruf' : sectionLabel}
       pageAction={
-        activeSection === 'analytics' ? (
+        !callId && activeSection === 'analytics' ? (
           <RangePicker value={range} onChange={setRange} />
         ) : undefined
       }
       lastUpdated={
-        activeSection === 'analytics'
+        !callId && activeSection === 'analytics'
           ? `${refreshedAt.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}, ${refreshedAt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
           : undefined
       }
     >
-      {activeSection === 'analytics' && (
+      {activeSection === 'analytics' && !callId && (
         <AnalyticsView analytics={analytics} onRefresh={loadAll} />
       )}
 
-      {activeSection === 'calls' && (
+      {activeSection === 'calls' && !callId && (
         <CallsView
           calls={calls}
-          onOpen={(callId) =>
-            navigate(isAdminPreview ? `/admin/calls/${callId}` : `/dashboard/calls/${callId}`)
-          }
+          onOpen={(cid) => navigate(`/dashboard/agents/${id}/calls/${cid}`)}
+        />
+      )}
+
+      {activeSection === 'calls' && callId && (
+        <CallDetailContent
+          callId={callId}
+          onBack={() => navigate(`/dashboard/agents/${id}`)}
+          backLabel="Zurück zu Gesprächen"
         />
       )}
 
@@ -789,14 +818,17 @@ function ConfigView({
       </div>
 
       <div className="glass-card p-6">
-        <label className="label-soft mb-3 block">Stimme</label>
+        <div className="mb-3 flex items-center justify-between">
+          <label className="label-soft">Stimme</label>
+          {!voicesLoading && voices.length === 0 && (
+            <span className="pill-neutral text-[10px]">Standard-Bibliothek</span>
+          )}
+        </div>
         {voicesLoading ? (
           <p className="py-4 text-center text-sm text-ink-muted">Lade Stimmen…</p>
-        ) : voices.length === 0 ? (
-          <p className="py-4 text-center text-sm text-ink-muted">Keine Stimmen verfügbar.</p>
         ) : (
           <div className="scrollbar-thin max-h-[440px] space-y-2 overflow-y-auto pr-1">
-            {voices.map((v) => {
+            {(voices.length > 0 ? voices : CURATED_VOICES).map((v) => {
               const active = (selectedVoice || currentVoiceId) === v.voice_id
               return (
                 <label

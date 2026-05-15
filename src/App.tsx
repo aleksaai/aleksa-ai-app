@@ -115,7 +115,7 @@ export default function App() {
         }
       />
       <Route
-        path="/dashboard/agents/:id"
+        path="/dashboard/agents/:id/*"
         element={
           <RequireAuth>
             <CustomerAgentDetail />
