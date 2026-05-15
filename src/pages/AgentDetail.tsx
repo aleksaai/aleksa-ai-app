@@ -220,7 +220,7 @@ export function AgentDetail() {
             <div
               aria-hidden
               className="absolute -right-16 -top-20 h-72 w-72 rounded-full opacity-40 blur-3xl"
-              style={{ background: 'radial-gradient(circle, #b2a3ff 0%, transparent 70%)' }}
+              style={{ background: 'radial-gradient(circle, var(--accent-400) 0%, transparent 70%)' }}
             />
             <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-4">
@@ -642,8 +642,8 @@ function InfoCard({ title, value, icon }: { title: string; value: string; icon: 
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-brand-700"
           style={{
-            background: 'linear-gradient(135deg, rgba(178,163,255,0.2) 0%, rgba(199,188,255,0.12) 100%)',
-            border: '1px solid rgba(178,163,255,0.25)',
+            background: 'linear-gradient(135deg, rgba(var(--accent-400-rgb),0.2) 0%, rgba(var(--accent-400-rgb),0.12) 100%)',
+            border: '1px solid rgba(var(--accent-400-rgb),0.25)',
           }}
         >
           {icon}
@@ -662,8 +662,8 @@ function AgentAvatar() {
     <div
       className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-white"
       style={{
-        background: 'linear-gradient(135deg, #b2a3ff 0%, #9d8af5 50%, #8676ea 100%)',
-        boxShadow: '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 8px 24px -8px rgba(135,118,234,0.55)',
+        background: 'linear-gradient(135deg, var(--accent-400) 0%, var(--accent-500) 50%, var(--accent-600) 100%)',
+        boxShadow: '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 8px 24px -8px rgba(var(--accent-shadow-rgb),0.55)',
       }}
     >
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -739,7 +739,7 @@ function DocIcon() {
     <div
       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-brand-700"
       style={{
-        background: 'linear-gradient(135deg, rgba(178,163,255,0.2) 0%, rgba(199,188,255,0.12) 100%)',
+        background: 'linear-gradient(135deg, rgba(var(--accent-400-rgb),0.2) 0%, rgba(var(--accent-400-rgb),0.12) 100%)',
       }}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

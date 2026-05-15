@@ -118,7 +118,7 @@ export function CustomerDetail() {
             <div
               aria-hidden
               className="absolute -right-20 -top-24 h-72 w-72 rounded-full opacity-40 blur-3xl"
-              style={{ background: 'radial-gradient(circle, #b2a3ff 0%, transparent 70%)' }}
+              style={{ background: 'radial-gradient(circle, var(--accent-400) 0%, transparent 70%)' }}
             />
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-4">
@@ -345,9 +345,9 @@ function BigAvatar({ name }: { name: string }) {
     <div
       className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-xl font-semibold text-white"
       style={{
-        background: 'linear-gradient(135deg, #b2a3ff 0%, #9d8af5 50%, #8676ea 100%)',
+        background: 'linear-gradient(135deg, var(--accent-400) 0%, var(--accent-500) 50%, var(--accent-600) 100%)',
         boxShadow:
-          '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 8px 24px -8px rgba(135,118,234,0.55)',
+          '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 8px 24px -8px rgba(var(--accent-shadow-rgb),0.55)',
       }}
     >
       {initials}
@@ -360,11 +360,11 @@ function AgentIconBadge() {
     <div
       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
       style={{
-        background: 'linear-gradient(135deg, rgba(178,163,255,0.25) 0%, rgba(199,188,255,0.18) 100%)',
-        border: '1px solid rgba(178,163,255,0.3)',
+        background: 'linear-gradient(135deg, rgba(var(--accent-400-rgb),0.25) 0%, rgba(var(--accent-400-rgb),0.18) 100%)',
+        border: '1px solid rgba(var(--accent-400-rgb),0.3)',
       }}
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6f5fd8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-700)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 1v6m0 0a4 4 0 1 1-4 4 4 4 0 0 1 4-4z" />
         <path d="M5 22v-2a7 7 0 0 1 14 0v2" />
       </svg>
