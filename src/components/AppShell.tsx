@@ -105,7 +105,10 @@ export function AppShell({
               <Logo />
               <div className="flex flex-col leading-none">
                 <span className="text-base font-semibold tracking-tight text-ink">AleksaAI</span>
-                <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-brand-700/80">
+                <span
+                  className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] opacity-80"
+                  style={{ color: 'var(--accent-700)' }}
+                >
                   Admin
                 </span>
               </div>
@@ -132,7 +135,7 @@ export function AppShell({
             <p className="truncate text-xs font-medium text-ink-soft">{user?.email}</p>
             <button
               onClick={signOut}
-              className="mt-2 text-xs font-medium text-ink-muted transition-colors hover:text-brand-700"
+              className="mt-2 text-xs font-medium text-ink-muted transition-colors hover:opacity-100 hover:[color:var(--accent-700)]"
             >
               Abmelden →
             </button>
@@ -181,7 +184,7 @@ export function AppShell({
                   <p className="truncate text-xs font-medium text-ink-soft">{user?.email}</p>
                   <button
                     onClick={signOut}
-                    className="mt-2 text-xs font-medium text-ink-muted hover:text-brand-700"
+                    className="mt-2 text-xs font-medium text-ink-muted hover:opacity-100 hover:[color:var(--accent-700)]"
                   >
                     Abmelden →
                   </button>
@@ -197,7 +200,7 @@ export function AppShell({
             {backTo && (
               <Link
                 to={backTo}
-                className="mb-4 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:text-brand-700"
+                className="mb-4 inline-flex items-center gap-1 text-sm text-ink-muted transition-colors hover:opacity-100 hover:[color:var(--accent-700)]"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M15 18l-6-6 6-6" />
@@ -234,8 +237,10 @@ function Logo() {
   return (
     <div className="relative flex h-8 w-8 items-center justify-center rounded-xl"
       style={{
-        background: 'linear-gradient(135deg, #b2a3ff 0%, #9d8af5 50%, #8676ea 100%)',
-        boxShadow: '0 1px 0 0 rgba(255,255,255,0.5) inset, 0 6px 18px -6px rgba(135,118,234,0.55)',
+        background:
+          'linear-gradient(135deg, var(--accent-400) 0%, var(--accent-500) 50%, var(--accent-600) 100%)',
+        boxShadow:
+          '0 1px 0 0 rgba(255,255,255,0.5) inset, 0 6px 18px -6px rgba(var(--accent-shadow-rgb),0.55)',
       }}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

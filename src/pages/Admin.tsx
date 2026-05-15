@@ -6,6 +6,15 @@ import type { Customer } from '../types/db'
 import { NewCustomerDialog } from '../components/NewCustomerDialog'
 import { AppShell } from '../components/AppShell'
 
+// A/B-test: blue accent (#65A4FF) only on this overview page.
+// Other admin pages stay on the default lavender for direct comparison.
+function useBlueAccent() {
+  useEffect(() => {
+    document.body.classList.add('theme-blue')
+    return () => document.body.classList.remove('theme-blue')
+  }, [])
+}
+
 type Kpi = {
   customers: number
   agents: number
@@ -14,6 +23,7 @@ type Kpi = {
 }
 
 export function Admin() {
+  useBlueAccent()
   const navigate = useNavigate()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [kpi, setKpi] = useState<Kpi>({ customers: 0, agents: 0, activeSubs: 0, pendingOnboarding: 0 })
@@ -120,7 +130,10 @@ export function Admin() {
                       year: 'numeric',
                     })}
                   </span>
-                  <span className="font-medium text-brand-700 opacity-0 transition-opacity group-hover:opacity-100">
+                  <span
+                    className="font-medium opacity-0 transition-opacity group-hover:opacity-100"
+                    style={{ color: 'var(--accent-700)' }}
+                  >
                     Öffnen →
                   </span>
                 </div>
@@ -154,7 +167,7 @@ function KpiCard({
         <div
           aria-hidden
           className="absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-30 blur-2xl"
-          style={{ background: 'radial-gradient(circle, #b2a3ff 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, var(--accent-400) 0%, transparent 70%)' }}
         />
       )}
       <p className="label-soft">{label}</p>
@@ -191,8 +204,10 @@ function Avatar({ name }: { name: string }) {
     <div
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
       style={{
-        background: 'linear-gradient(135deg, #b2a3ff 0%, #9d8af5 50%, #8676ea 100%)',
-        boxShadow: '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 4px 14px -4px rgba(135,118,234,0.45)',
+        background:
+          'linear-gradient(135deg, var(--accent-400) 0%, var(--accent-500) 50%, var(--accent-600) 100%)',
+        boxShadow:
+          '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 4px 14px -4px rgba(var(--accent-shadow-rgb),0.45)',
       }}
     >
       {initials}
@@ -209,9 +224,12 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     >
       <div
         className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-        style={{ background: 'linear-gradient(135deg, #ede9ff 0%, #c8bcff 100%)' }}
+        style={{
+          background:
+            'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.2) 0%, rgba(var(--accent-400-rgb), 0.4) 100%)',
+        }}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6f5fd8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-700)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 5v14M5 12h14" />
         </svg>
       </div>
