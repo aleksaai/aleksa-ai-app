@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { supabase } from '../lib/supabase'
@@ -6,45 +6,20 @@ import type { Customer } from '../types/db'
 import { NewCustomerDialog } from '../components/NewCustomerDialog'
 import { AppShell } from '../components/AppShell'
 
-// A/B-test: blue accent (#65A4FF) only on this overview page.
-// Other admin pages stay on the default lavender for direct comparison.
-function useBlueAccent() {
-  useEffect(() => {
-    document.body.classList.add('theme-blue')
-    return () => document.body.classList.remove('theme-blue')
-  }, [])
-}
-
-type Kpi = {
-  customers: number
-  agents: number
-  activeSubs: number
-  pendingOnboarding: number
-}
-
 export function Admin() {
-  useBlueAccent()
   const navigate = useNavigate()
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [kpi, setKpi] = useState<Kpi>({ customers: 0, agents: 0, activeSubs: 0, pendingOnboarding: 0 })
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [search, setSearch] = useState('')
 
   const loadAll = async () => {
     setLoading(true)
-    const [{ data: cs }, { count: agentCount }, { count: subCount }] = await Promise.all([
-      supabase.from('customers').select('*').order('created_at', { ascending: false }),
-      supabase.from('voice_agents').select('*', { count: 'exact', head: true }),
-      supabase.from('customer_subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    ])
-    const list = (cs as Customer[]) ?? []
-    setCustomers(list)
-    setKpi({
-      customers: list.length,
-      agents: agentCount ?? 0,
-      activeSubs: subCount ?? 0,
-      pendingOnboarding: list.filter((c) => !c.has_payment_method).length,
-    })
+    const { data } = await supabase
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setCustomers((data ?? []) as Customer[])
     setLoading(false)
   }
 
@@ -52,12 +27,21 @@ export function Admin() {
     loadAll()
   }, [])
 
+  const filtered = useMemo(() => {
+    if (!search.trim()) return customers
+    const q = search.toLowerCase().trim()
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) || c.contact_email.toLowerCase().includes(q),
+    )
+  }, [customers, search])
+
   return (
     <AppShell
       pageEyebrow="Übersicht"
       pageTitle={
         <>
-          Willkommen <span className="heading-accent">zurück</span>
+          Deine <span className="heading-accent">Kunden</span>
         </>
       }
       pageAction={
@@ -66,115 +50,107 @@ export function Admin() {
         </button>
       }
     >
-      {/* ============ KPI ROW ============ */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          label="Kunden"
-          value={kpi.customers}
-          hint={`${kpi.pendingOnboarding} im Onboarding`}
-          accent
-        />
-        <KpiCard label="Voice-Agenten" value={kpi.agents} hint="Live + im Setup" />
-        <KpiCard label="Aktive Abos" value={kpi.activeSubs} hint="Stripe-Subscriptions" />
-        <KpiCard
-          label="Onboarding offen"
-          value={kpi.pendingOnboarding}
-          hint={kpi.pendingOnboarding > 0 ? 'Brauchen Zahlungsmethode' : 'Alle aktiv'}
-          warn={kpi.pendingOnboarding > 0}
-        />
+      {/* ============ SEARCH ============ */}
+      <div className="mb-6">
+        <SearchBar value={search} onChange={setSearch} count={filtered.length} total={customers.length} />
       </div>
 
       {/* ============ CUSTOMERS LIST ============ */}
-      <section className="mt-10">
-        <div className="mb-5 flex items-end justify-between">
-          <div>
-            <p className="eyebrow mb-1">Kundenliste</p>
-            <h2 className="text-xl font-semibold tracking-tight">
-              Alle <span className="heading-accent">Kunden</span>
-            </h2>
-          </div>
+      {loading ? (
+        <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade…</div>
+      ) : customers.length === 0 ? (
+        <EmptyState onCreate={() => setDialogOpen(true)} />
+      ) : filtered.length === 0 ? (
+        <div className="glass-card p-10 text-center text-sm text-ink-muted">
+          Keine Kunden gefunden für "<strong className="text-ink">{search}</strong>".
         </div>
-
-        {loading ? (
-          <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade…</div>
-        ) : customers.length === 0 ? (
-          <EmptyState onCreate={() => setDialogOpen(true)} />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {customers.map((c, i) => (
-              <motion.button
-                key={c.id}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{ y: -2 }}
-                onClick={() => navigate(`/admin/customers/${c.id}`)}
-                className="group relative overflow-hidden rounded-2xl glass p-5 text-left transition-all hover:shadow-glass-lg"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={c.name} />
-                    <div>
-                      <p className="font-semibold tracking-tight text-ink">{c.name}</p>
-                      <p className="mt-0.5 text-xs text-ink-muted">{c.contact_email}</p>
-                    </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((c, i) => (
+            <motion.button
+              key={c.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -2 }}
+              onClick={() => navigate(`/admin/customers/${c.id}`)}
+              className="group relative overflow-hidden rounded-2xl glass p-5 text-left transition-all hover:shadow-glass-lg"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar name={c.name} />
+                  <div>
+                    <p className="font-semibold tracking-tight text-ink">{c.name}</p>
+                    <p className="mt-0.5 text-xs text-ink-muted">{c.contact_email}</p>
                   </div>
-                  <StatusPill ok={c.has_payment_method} />
                 </div>
+                <StatusPill ok={c.has_payment_method} />
+              </div>
 
-                <div className="mt-5 flex items-center justify-between border-t border-white/40 pt-3 text-xs text-ink-muted">
-                  <span>
-                    {new Date(c.created_at).toLocaleDateString('de-DE', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </span>
-                  <span
-                    className="font-medium opacity-0 transition-opacity group-hover:opacity-100"
-                    style={{ color: 'var(--accent-700)' }}
-                  >
-                    Öffnen →
-                  </span>
-                </div>
-              </motion.button>
-            ))}
-          </div>
-        )}
-      </section>
+              <div className="mt-5 flex items-center justify-between border-t border-white/40 pt-3 text-xs text-ink-muted">
+                <span>
+                  Seit{' '}
+                  {new Date(c.created_at).toLocaleDateString('de-DE', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </span>
+                <span
+                  className="font-medium opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{ color: 'var(--accent-700)' }}
+                >
+                  Öffnen →
+                </span>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      )}
 
       <NewCustomerDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={loadAll} />
     </AppShell>
   )
 }
 
-function KpiCard({
-  label,
+function SearchBar({
   value,
-  hint,
-  accent,
-  warn,
+  onChange,
+  count,
+  total,
 }: {
-  label: string
-  value: number | string
-  hint?: string
-  accent?: boolean
-  warn?: boolean
+  value: string
+  onChange: (v: string) => void
+  count: number
+  total: number
 }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl glass p-5">
-      {accent && (
-        <div
-          aria-hidden
-          className="absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-30 blur-2xl"
-          style={{ background: 'radial-gradient(circle, var(--accent-400) 0%, transparent 70%)' }}
-        />
-      )}
-      <p className="label-soft">{label}</p>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-ink">{value}</p>
-      {hint && (
-        <p className={`mt-1.5 text-xs ${warn ? 'text-amber-700' : 'text-ink-muted'}`}>{hint}</p>
-      )}
+    <div className="relative">
+      <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-ink-muted">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Kunden suchen…"
+        className="glass-input w-full pl-12 pr-32"
+        style={{ paddingTop: '0.75rem', paddingBottom: '0.75rem' }}
+      />
+      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs text-ink-muted">
+        {value.trim() ? (
+          <span>
+            {count} von {total}
+          </span>
+        ) : (
+          <span>
+            {total} {total === 1 ? 'Kunde' : 'Kunden'}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

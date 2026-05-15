@@ -8,18 +8,18 @@ export default {
         serif: ['"Instrument Serif"', 'serif'],
       },
       colors: {
-        // Brand: soft lavender / periwinkle anchored at #B2A3FF
+        // Brand: sky blue anchored at #65A4FF
         brand: {
-          50: '#f6f4ff',
-          100: '#ede9ff',
-          200: '#ddd5ff',
-          300: '#c8bcff',
-          400: '#b2a3ff',
-          500: '#9d8af5',
-          600: '#8676ea',
-          700: '#6f5fd8',
-          800: '#574bb0',
-          900: '#423886',
+          50: '#eef5ff',
+          100: '#dde9ff',
+          200: '#c2dafa',
+          300: '#91bcff',
+          400: '#65a4ff',
+          500: '#4188ee',
+          600: '#2f72d8',
+          700: '#1f5cbd',
+          800: '#144495',
+          900: '#0b3375',
         },
         canvas: '#fafafb',
         ink: {

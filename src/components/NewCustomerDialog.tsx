@@ -60,7 +60,7 @@ export function NewCustomerDialog({ open, onClose, onCreated }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-slate-900/50"
+            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-md"
             onClick={handleClose}
           />
           <motion.div
@@ -145,41 +145,43 @@ export function NewCustomerDialog({ open, onClose, onCreated }: Props) {
                 </form>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-emerald-700">Customer angelegt ✓</h2>
-                    <p className="mt-1 text-sm text-slate-600">
-                      <strong>{name}</strong> wurde als Stripe-Customer angelegt.
+                  <div className="text-center">
+                    <div
+                      className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
+                      style={{ background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' }}
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#047857" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold tracking-tight">
+                      <strong>{name}</strong> <span className="heading-accent">angelegt</span>
+                    </h2>
+                    <p className="mt-1.5 text-sm text-ink-muted">
                       {result?.email_sent
-                        ? ' Die Einladungs-Mail wurde verschickt.'
-                        : ' ⚠️ Die Email konnte nicht versandt werden — teil den Link manuell.'}
+                        ? 'Die Einladungs-Mail wurde verschickt.'
+                        : '⚠️ Die Email konnte nicht versandt werden — kopier den Link manuell.'}
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Invitation-Link
-                    </p>
-                    <p className="break-all font-mono text-xs text-slate-700">
-                      {result?.invite_link}
-                    </p>
-                    <button
-                      onClick={copyInviteLink}
-                      className="btn-ghost mt-2 text-xs"
-                    >
-                      {copiedInvite ? '✓ Kopiert' : 'Link kopieren'}
-                    </button>
-                  </div>
+                  {!result?.email_sent && (
+                    <div className="rounded-xl bg-white/50 p-3">
+                      <p className="label-soft mb-2">Einladungs-Link</p>
+                      <button
+                        onClick={copyInviteLink}
+                        className="btn-ghost w-full text-xs"
+                      >
+                        {copiedInvite ? '✓ In Zwischenablage kopiert' : 'Link kopieren'}
+                      </button>
+                    </div>
+                  )}
 
                   {result?.email_error && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
+                    <div className="rounded-xl border border-amber-200/50 bg-amber-50/60 p-3 text-xs">
                       <p className="mb-1 font-medium text-amber-900">Resend-Fehler:</p>
                       <p className="break-words font-mono text-amber-800">{result.email_error}</p>
                     </div>
                   )}
-
-                  <div className="text-xs text-slate-500">
-                    Stripe Customer-ID: <code>{result?.stripe_customer_id}</code>
-                  </div>
 
                   <button onClick={handleClose} className="btn-primary w-full">
                     Fertig

@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import type { PricingPlan } from '../types/db'
 import { NewPricingPlanDialog } from '../components/NewPricingPlanDialog'
+import { AppShell } from '../components/AppShell'
 
 function formatPrice(cents: number | null, currency: string) {
   if (cents == null) return '—'
@@ -15,15 +14,10 @@ function planSummary(plan: PricingPlan): string {
   if (plan.type === 'hybrid') {
     return `${formatPrice(plan.flat_amount_cents, plan.currency)}/${plan.billing_interval === 'year' ? 'Jahr' : 'Monat'} + ${plan.included_minutes} Min frei + ${plan.per_minute_overage_cents}ct/Min danach`
   }
-  if (plan.type === 'per_minute') {
-    return `${plan.per_minute_overage_cents}ct/Min, monatlich summiert`
-  }
-  if (plan.type === 'flat') {
+  if (plan.type === 'per_minute') return `${plan.per_minute_overage_cents}ct/Min, monatlich summiert`
+  if (plan.type === 'flat')
     return `${formatPrice(plan.flat_amount_cents, plan.currency)}/${plan.billing_interval === 'year' ? 'Jahr' : 'Monat'} flat`
-  }
-  if (plan.type === 'one_time') {
-    return `${formatPrice(plan.flat_amount_cents, plan.currency)} einmalig`
-  }
+  if (plan.type === 'one_time') return `${formatPrice(plan.flat_amount_cents, plan.currency)} einmalig`
   return plan.type
 }
 
@@ -43,7 +37,6 @@ function typeLabel(type: string): string {
 }
 
 export function PricingPlans() {
-  const { user, signOut } = useAuth()
   const [plans, setPlans] = useState<PricingPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -64,88 +57,92 @@ export function PricingPlans() {
   }, [])
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-4">
-            <Link to="/admin" className="text-lg font-semibold">
-              AleksaAI Admin
-            </Link>
-            <nav className="flex gap-1">
-              <Link to="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Kunden</Link>
-              <Link to="/admin/agents" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Agenten</Link>
-              <Link to="/admin/integrations" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Integrationen</Link>
-              <Link to="/admin/pricing-plans" className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900">Pricing-Pakete</Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600">{user?.email}</span>
-            <button onClick={signOut} className="btn-ghost text-sm">
-              Abmelden
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">Pricing-Pakete</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {plans.length === 0
-                ? 'Noch keine Pakete. Leg dein erstes an.'
-                : `${plans.length} aktive ${plans.length === 1 ? 'Paket' : 'Pakete'}.`}
-            </p>
-          </div>
-          <button onClick={() => setDialogOpen(true)} className="btn-primary">
-            + Neues Paket
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="card text-center text-sm text-slate-500">Lade…</div>
-        ) : plans.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="card text-center"
+    <AppShell
+      pageEyebrow="Pricing"
+      pageTitle={
+        <>
+          Deine <span className="heading-accent">Pakete</span>
+        </>
+      }
+      pageAction={
+        <button onClick={() => setDialogOpen(true)} className="btn-primary">
+          <PlusIcon /> Neues Paket
+        </button>
+      }
+    >
+      {loading ? (
+        <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade…</div>
+      ) : plans.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card-lg p-12 text-center"
+        >
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.2) 0%, rgba(var(--accent-400-rgb), 0.4) 100%)',
+            }}
           >
-            <h3 className="text-base font-medium">Noch leer hier</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Pricing-Pakete bestimmen wie deine Customers für Voice-Agent-Nutzung bezahlen.
-            </p>
-          </motion.div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {plans.map((p) => (
-              <motion.div
-                key={p.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="card"
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
-                    {typeLabel(p.type)}
-                  </span>
-                  <span className="text-xs text-slate-400">{p.currency}</span>
-                </div>
-                <h3 className="text-base font-semibold">{p.name}</h3>
-                <p className="mt-1 text-sm text-slate-600">{planSummary(p)}</p>
-                <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-400">
-                  Stripe: <code className="text-slate-500">{p.stripe_product_id?.slice(0, 18)}…</code>
-                </div>
-              </motion.div>
-            ))}
+            <TagIcon />
           </div>
-        )}
-      </main>
+          <h3 className="text-lg font-semibold tracking-tight">
+            Noch <span className="heading-accent">keine Pakete</span>
+          </h3>
+          <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-muted">
+            Pricing-Pakete bestimmen, wie deine Kunden für Voice-Agent-Nutzung bezahlen.
+          </p>
+          <button onClick={() => setDialogOpen(true)} className="btn-primary mt-6">
+            <PlusIcon /> Erstes Paket anlegen
+          </button>
+        </motion.div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {plans.map((p, i) => (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.04, 0.3) }}
+              className="rounded-2xl glass p-5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="pill-brand">{typeLabel(p.type)}</span>
+                <span className="text-xs font-medium text-ink-dim">{p.currency}</span>
+              </div>
+              <h3 className="mt-4 text-lg font-semibold tracking-tight text-ink">{p.name}</h3>
+              <p className="mt-1.5 text-sm text-ink-soft">{planSummary(p)}</p>
 
-      <NewPricingPlanDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onCreated={load}
-      />
-    </div>
+              {p.included_minutes != null && p.type === 'hybrid' && (
+                <div className="mt-4 rounded-xl bg-white/50 p-3">
+                  <p className="label-soft mb-1">Inklusive</p>
+                  <p className="text-sm font-semibold text-ink">{p.included_minutes} Minuten</p>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      <NewPricingPlanDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={load} />
+    </AppShell>
+  )
+}
+
+function TagIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-700)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41L13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <circle cx="7" cy="7" r="1.5" />
+    </svg>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
   )
 }

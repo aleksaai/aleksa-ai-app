@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import type { Integration } from '../types/db'
 import { NewIntegrationDialog } from '../components/NewIntegrationDialog'
+import { AppShell } from '../components/AppShell'
 
-const PLATFORM_BADGE: Record<string, string> = {
-  elevenlabs: 'bg-purple-100 text-purple-800',
-  retellai: 'bg-blue-100 text-blue-800',
-  vapi: 'bg-green-100 text-green-800',
-  openai: 'bg-slate-100 text-slate-800',
+const PLATFORM_LABEL: Record<string, string> = {
+  elevenlabs: 'ElevenLabs',
+  retellai: 'Retell AI',
+  vapi: 'Vapi',
+  openai: 'OpenAI',
 }
 
 export function Integrations() {
-  const { user, signOut } = useAuth()
   const [list, setList] = useState<Integration[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -34,74 +32,140 @@ export function Integrations() {
   }, [])
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-4">
-            <Link to="/admin" className="text-lg font-semibold">AleksaAI Admin</Link>
-            <nav className="flex gap-1">
-              <Link to="/admin" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Kunden</Link>
-              <Link to="/admin/agents" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Agenten</Link>
-              <Link to="/admin/integrations" className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-900">Integrationen</Link>
-              <Link to="/admin/pricing-plans" className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Pricing-Pakete</Link>
-            </nav>
+    <AppShell
+      pageEyebrow="Integrationen"
+      pageTitle={
+        <>
+          Verbundene <span className="heading-accent">Plattformen</span>
+        </>
+      }
+      pageAction={
+        <button onClick={() => setDialogOpen(true)} className="btn-primary">
+          <PlusIcon /> Neue Integration
+        </button>
+      }
+    >
+      {loading ? (
+        <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade…</div>
+      ) : list.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card-lg p-12 text-center"
+        >
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.2) 0%, rgba(var(--accent-400-rgb), 0.4) 100%)',
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-700)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 7V2m6 5V2M5 13a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v3a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-3z" />
+            </svg>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600">{user?.email}</span>
-            <button onClick={signOut} className="btn-ghost text-sm">Abmelden</button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">Integrationen</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {list.length === 0
-                ? 'Verbinde einen Voice-AI- oder LLM-Provider, um Agenten anzulegen.'
-                : `${list.length} verbundene ${list.length === 1 ? 'Integration' : 'Integrationen'}.`}
-            </p>
-          </div>
-          <button onClick={() => setDialogOpen(true)} className="btn-primary">
-            + Neue Integration
+          <h3 className="text-lg font-semibold tracking-tight">
+            Noch <span className="heading-accent">keine Integrationen</span>
+          </h3>
+          <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-muted">
+            Verbinde ElevenLabs, RetellAI, Vapi oder OpenAI, um Voice-Agenten anzulegen.
+          </p>
+          <button onClick={() => setDialogOpen(true)} className="btn-primary mt-6">
+            <PlusIcon /> Erste Integration verbinden
           </button>
-        </div>
-
-        {loading ? (
-          <div className="card text-center text-sm text-slate-500">Lade…</div>
-        ) : list.length === 0 ? (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card text-center">
-            <h3 className="text-base font-medium">Noch keine Integrationen</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              ElevenLabs, RetellAI, Vapi oder OpenAI verbinden.
-            </p>
-          </motion.div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {list.map((i) => (
-              <motion.div key={i.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${PLATFORM_BADGE[i.platform] ?? 'bg-slate-100 text-slate-700'}`}>
-                    {i.platform}
-                  </span>
-                  {i.platform === 'elevenlabs' && i.region && (
-                    <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                      {i.region.toUpperCase()}
-                    </span>
-                  )}
+        </motion.div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {list.map((i, idx) => (
+            <motion.div
+              key={i.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(idx * 0.04, 0.3) }}
+              className="group rounded-2xl glass p-5"
+            >
+              <div className="flex items-start gap-3">
+                <PlatformLogo platform={i.platform} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold tracking-tight text-ink">{i.name}</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    {PLATFORM_LABEL[i.platform] ?? i.platform}
+                  </p>
                 </div>
-                <h3 className="text-base font-semibold">{i.name}</h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Verbunden am {new Date(i.created_at).toLocaleDateString('de-DE')}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </main>
+                {i.active ? (
+                  <span className="pill-success">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Aktiv
+                  </span>
+                ) : (
+                  <span className="pill-neutral">Inaktiv</span>
+                )}
+              </div>
+
+              <div className="mt-4 flex items-center justify-between border-t border-white/40 pt-3 text-xs text-ink-muted">
+                <span>
+                  Seit{' '}
+                  {new Date(i.created_at).toLocaleDateString('de-DE', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </span>
+                {i.platform === 'elevenlabs' && i.region && (
+                  <span className="pill-brand">{i.region.toUpperCase()}</span>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <NewIntegrationDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onCreated={load} />
+    </AppShell>
+  )
+}
+
+function PlatformLogo({ platform }: { platform: string }) {
+  return (
+    <div
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+      style={{
+        background:
+          'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.18) 0%, rgba(var(--accent-400-rgb), 0.08) 100%)',
+        border: '1px solid rgba(var(--accent-400-rgb), 0.25)',
+      }}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-700)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        {platform === 'elevenlabs' && (
+          <>
+            <path d="M9 5v14M15 5v14" />
+            <path d="M5 9v6M19 9v6" />
+          </>
+        )}
+        {platform === 'retellai' && (
+          <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 3" />
+          </>
+        )}
+        {platform === 'vapi' && <path d="M3 12h4l3-8 4 16 3-8h4" />}
+        {platform === 'openai' && (
+          <>
+            <circle cx="12" cy="12" r="3" />
+            <circle cx="12" cy="12" r="9" />
+          </>
+        )}
+        {!['elevenlabs', 'retellai', 'vapi', 'openai'].includes(platform) && (
+          <path d="M9 7V2m6 5V2M5 13a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v3a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-3z" />
+        )}
+      </svg>
     </div>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
   )
 }

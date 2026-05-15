@@ -112,7 +112,7 @@ export function NewPricingPlanDialog({ open, onClose, onCreated }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-slate-900/50"
+            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-md"
             onClick={handleClose}
           />
           <motion.div

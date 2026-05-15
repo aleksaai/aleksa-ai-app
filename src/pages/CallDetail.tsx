@@ -1,18 +1,15 @@
-// CallDetail page — works for both admin (always full access) and customer_owner
-// (server enforces permissions). One route for both:
-//   - /admin/calls/:id   (Admin context, navigated from CustomerDetail's preview)
-//   - /dashboard/calls/:id (Customer context, navigated from Dashboard)
-
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useAuth } from '../lib/auth'
 import { adminGetCallDetail, fetchCallAudioBlobUrl, type CallDetail as CallDetailType } from '../lib/api'
 import { formatDuration } from '../lib/billing'
+import { CustomerShell } from '../components/CustomerShell'
+import { AppShell } from '../components/AppShell'
 
 export function CallDetail() {
   const { id } = useParams<{ id: string }>()
-  const { user, profile, signOut } = useAuth()
+  const { profile } = useAuth()
   const location = useLocation()
   const isAdminRoute = location.pathname.startsWith('/admin')
 
@@ -39,7 +36,6 @@ export function CallDetail() {
     })()
   }, [id])
 
-  // Load audio on demand (only if detail.audio_available)
   const handleLoadAudio = async () => {
     if (!id || audioUrl) return
     setAudioLoading(true)
@@ -54,7 +50,6 @@ export function CallDetail() {
     }
   }
 
-  // Cleanup blob URL on unmount
   useEffect(() => {
     return () => {
       if (audioUrl) URL.revokeObjectURL(audioUrl)
@@ -62,137 +57,176 @@ export function CallDetail() {
   }, [audioUrl])
 
   const backLink = isAdminRoute ? '/admin' : '/dashboard'
+  const backLabel = isAdminRoute ? 'Zurück zur Übersicht' : 'Zurück zum Dashboard'
 
-  return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <h1 className="text-lg font-semibold">
-            {profile?.role === 'admin' ? 'AleksaAI Admin' : 'Mein Dashboard'}
-          </h1>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600">{user?.email}</span>
-            <button onClick={signOut} className="btn-ghost text-sm">Abmelden</button>
-          </div>
+  const content = (
+    <>
+      {loading ? (
+        <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade Call-Detail…</div>
+      ) : error ? (
+        <div className="glass-card-lg mx-auto max-w-md p-8 text-center">
+          <h2 className="text-lg font-semibold text-red-700">Kein Zugriff</h2>
+          <p className="mt-2 text-sm text-ink-muted">{error}</p>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-4">
-          <Link to={backLink} className="text-sm text-slate-500 hover:text-slate-900">← Zurück</Link>
-        </div>
-
-        {loading ? (
-          <div className="card text-center text-sm text-slate-500">Lade Call-Detail…</div>
-        ) : error ? (
-          <div className="card">
-            <h2 className="text-lg font-semibold text-red-700">Kein Zugriff</h2>
-            <p className="mt-1 text-sm text-slate-500">{error}</p>
-          </div>
-        ) : detail ? (
-          <>
-            {/* Metadata Card */}
-            <section className="card mb-6">
-              <h2 className="text-xl font-semibold">Call</h2>
-              <p className="mt-1 font-mono text-xs text-slate-500">{detail.conversation_id}</p>
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Stat label="Datum" value={new Date(detail.started_at).toLocaleString('de-DE', {
-                  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                })} />
-                <Stat label="Dauer" value={formatDuration(detail.duration_secs)} />
-                <Stat label="Agent" value={detail.agent_name ?? '—'} />
-                <Stat label="Beendet weil" value={detail.termination_reason ?? '—'} small />
+      ) : detail ? (
+        <>
+          {/* Metadata Hero */}
+          <section className="relative overflow-hidden rounded-3xl glass-card-lg p-8">
+            <div
+              aria-hidden
+              className="absolute -right-16 -top-20 h-72 w-72 rounded-full opacity-40 blur-3xl"
+              style={{ background: 'radial-gradient(circle, var(--accent-400) 0%, transparent 70%)' }}
+            />
+            <div className="relative">
+              <p className="eyebrow mb-1.5">Anruf-Detail</p>
+              <h1 className="text-3xl font-semibold tracking-tight">
+                {new Date(detail.started_at).toLocaleString('de-DE', {
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric',
+                })}
+              </h1>
+              <p className="mt-1 text-sm text-ink-muted">
+                um{' '}
+                {new Date(detail.started_at).toLocaleTimeString('de-DE', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}{' '}
+                Uhr · {formatDuration(detail.duration_secs)}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {detail.agent_name && (
+                  <span className="pill-brand">
+                    <AgentIcon /> {detail.agent_name}
+                  </span>
+                )}
+                {detail.termination_reason && (
+                  <span className="pill-neutral">Ende: {detail.termination_reason}</span>
+                )}
               </div>
-              {detail.cost_credits != null && profile?.role === 'admin' && (
-                <p className="mt-3 text-xs text-slate-500">
-                  ElevenLabs-Kosten (Credits): <strong>{detail.cost_credits}</strong>
-                </p>
+            </div>
+          </section>
+
+          {/* Summary */}
+          {detail.transcript_summary && (
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 glass-card p-6"
+            >
+              <p className="label-soft mb-2">Zusammenfassung</p>
+              <p className="text-sm leading-relaxed text-ink-soft">{detail.transcript_summary}</p>
+            </motion.section>
+          )}
+
+          {/* Audio */}
+          {detail.audio_available && (
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 glass-card p-6"
+            >
+              <p className="label-soft mb-3">Audio-Aufnahme</p>
+              {!audioUrl ? (
+                <button
+                  onClick={handleLoadAudio}
+                  disabled={audioLoading}
+                  className="btn-primary text-sm"
+                >
+                  {audioLoading ? 'Lade Audio…' : '▶  Audio laden'}
+                </button>
+              ) : (
+                <audio src={audioUrl} controls className="w-full" />
               )}
-            </section>
+              {audioError && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700">
+                  {audioError}
+                </div>
+              )}
+            </motion.section>
+          )}
 
-            {/* Summary (if transcript permission) */}
-            {detail.transcript_summary && (
-              <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card mb-6">
-                <h3 className="mb-2 text-base font-semibold">Zusammenfassung</h3>
-                <p className="text-sm text-slate-700">{detail.transcript_summary}</p>
-              </motion.section>
-            )}
-
-            {/* Audio (if permission) */}
-            {detail.audio_available && (
-              <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card mb-6">
-                <h3 className="mb-3 text-base font-semibold">Audio-Aufnahme</h3>
-                {!audioUrl ? (
-                  <button
-                    onClick={handleLoadAudio}
-                    disabled={audioLoading}
-                    className="btn-primary text-sm"
-                  >
-                    {audioLoading ? 'Lade Audio…' : '▶ Audio laden'}
-                  </button>
-                ) : (
-                  <audio src={audioUrl} controls className="w-full" />
-                )}
-                {audioError && (
-                  <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    {audioError}
-                  </div>
-                )}
-              </motion.section>
-            )}
-
-            {/* Transcript (if permission) */}
-            {detail.transcript ? (
-              <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card">
-                <h3 className="mb-3 text-base font-semibold">Transkript</h3>
-                {detail.transcript.length === 0 ? (
-                  <p className="text-sm text-slate-500">Kein Transkript verfügbar.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {detail.transcript.map((turn, i) => {
-                      const isAgent = turn.role === 'agent'
-                      return (
-                        <div key={i} className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}>
-                          <div
-                            className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                              isAgent
-                                ? 'bg-brand-50 text-slate-900'
-                                : 'bg-slate-100 text-slate-900'
-                            }`}
-                          >
-                            <div className="mb-1 text-xs font-medium uppercase tracking-wide opacity-60">
-                              {isAgent ? 'Agent' : 'Anrufer'}
-                              {typeof turn.time_in_call_secs === 'number' && (
-                                <span className="ml-2 font-normal">
-                                  {Math.floor(turn.time_in_call_secs / 60)}:{(Math.floor(turn.time_in_call_secs) % 60).toString().padStart(2, '0')}
-                                </span>
-                              )}
-                            </div>
-                            <div className="whitespace-pre-wrap">{turn.message ?? <em className="text-slate-400">(leer)</em>}</div>
+          {/* Transcript */}
+          {detail.transcript ? (
+            <motion.section
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 glass-card p-6"
+            >
+              <p className="label-soft mb-4">Transkript</p>
+              {detail.transcript.length === 0 ? (
+                <p className="text-sm text-ink-muted">Kein Transkript verfügbar.</p>
+              ) : (
+                <div className="space-y-3">
+                  {detail.transcript.map((turn, i) => {
+                    const isAgent = turn.role === 'agent'
+                    const mins =
+                      typeof turn.time_in_call_secs === 'number'
+                        ? `${Math.floor(turn.time_in_call_secs / 60)}:${(
+                            Math.floor(turn.time_in_call_secs) % 60
+                          )
+                            .toString()
+                            .padStart(2, '0')}`
+                        : null
+                    return (
+                      <div
+                        key={i}
+                        className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm`}
+                          style={{
+                            background: isAgent
+                              ? 'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.18) 0%, rgba(var(--accent-400-rgb), 0.1) 100%)'
+                              : 'rgba(255, 255, 255, 0.75)',
+                            border: isAgent
+                              ? '1px solid rgba(var(--accent-400-rgb), 0.25)'
+                              : '1px solid rgba(0, 0, 0, 0.05)',
+                          }}
+                        >
+                          <div className="mb-1 flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider opacity-60">
+                            <span>{isAgent ? 'Agent' : 'Anrufer'}</span>
+                            {mins && <span className="font-normal">{mins}</span>}
+                          </div>
+                          <div className="whitespace-pre-wrap text-ink">
+                            {turn.message ?? <em className="text-ink-dim">(leer)</em>}
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </motion.section>
-            ) : detail.permissions.canViewTranscripts === false && profile?.role !== 'admin' ? (
-              <div className="card text-center text-sm text-slate-500">
-                Transkript-Einsicht ist für deinen Account nicht freigeschaltet.
-              </div>
-            ) : null}
-          </>
-        ) : null}
-      </main>
-    </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </motion.section>
+          ) : detail.permissions.canViewTranscripts === false && profile?.role !== 'admin' ? (
+            <div className="mt-4 glass-card p-6 text-center text-sm text-ink-muted">
+              Die Einsicht in Transkripte ist für dein Konto nicht freigeschaltet.
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  )
+
+  if (isAdminRoute) {
+    return (
+      <AppShell backTo={backLink} backLabel={backLabel}>
+        {content}
+      </AppShell>
+    )
+  }
+  return (
+    <CustomerShell backTo={backLink} backLabel={backLabel}>
+      {content}
+    </CustomerShell>
   )
 }
 
-function Stat({ label, value, small }: { label: string; value: string; small?: boolean }) {
+function AgentIcon() {
   return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`mt-0.5 font-semibold text-slate-900 ${small ? 'text-sm' : 'text-base'}`}>{value}</p>
-    </div>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1v6a4 4 0 0 1 0 8v2" />
+      <path d="M5 22v-2a7 7 0 0 1 14 0v2" />
+    </svg>
   )
 }

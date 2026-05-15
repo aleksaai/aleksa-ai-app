@@ -4,20 +4,7 @@
 
 @layer base {
   :root {
-    /* Default accent: Lavender (#B2A3FF anchor) */
-    --accent-200: #ddd5ff;
-    --accent-300: #c8bcff;
-    --accent-400: #b2a3ff;
-    --accent-500: #9d8af5;
-    --accent-600: #8676ea;
-    --accent-700: #6f5fd8;
-    --accent-800: #574bb0;
-    --accent-400-rgb: 178, 163, 255;
-    --accent-500-rgb: 157, 138, 245;
-    --accent-shadow-rgb: 135, 118, 234;
-  }
-  /* Override: A/B-test blue accent (#65A4FF anchor) */
-  body.theme-blue {
+    /* Brand accent: sky blue (#65A4FF anchor) */
     --accent-200: #c2dafa;
     --accent-300: #91bcff;
     --accent-400: #65a4ff;

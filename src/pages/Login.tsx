@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { motion } from 'motion/react'
 import { supabase } from '../lib/supabase'
+import { AuthShell } from '../components/AuthShell'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -14,9 +15,7 @@ export function Login() {
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/admin`,
-      },
+      options: { emailRedirectTo: `${window.location.origin}/admin` },
     })
 
     if (error) {
@@ -28,66 +27,82 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-brand-50 p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="card w-full max-w-md"
-      >
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-slate-900">AleksaAI App</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Anmelden mit deiner Email-Adresse
-          </p>
-        </div>
-
-        {status === 'sent' ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+    <AuthShell>
+      {status === 'sent' ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div
+            className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl"
+            style={{
+              background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+            }}
           >
-            <p className="font-medium">Magic-Link gesendet ✓</p>
-            <p className="mt-1">
-              Wir haben dir eine Email an <strong>{email}</strong> geschickt. Klick auf den Link um dich anzumelden.
-            </p>
-          </motion.div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="du@example.com"
-                className="input"
-                disabled={status === 'loading'}
-              />
-            </div>
-
-            {status === 'error' && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                {errorMsg}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={status === 'loading' || !email}
-              className="btn-primary w-full"
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#047857"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              {status === 'loading' ? 'Senden…' : 'Magic-Link senden'}
-            </button>
-          </form>
-        )}
-      </motion.div>
-    </div>
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Magic-Link <span className="heading-accent">gesendet</span>
+          </h1>
+          <p className="mt-2 text-sm text-ink-muted">
+            Wir haben dir eine E-Mail an <strong className="text-ink-soft">{email}</strong> geschickt. Klick auf den Link, um dich anzumelden.
+          </p>
+        </motion.div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              <span className="heading-accent">Willkommen</span> zurück
+            </h1>
+            <p className="mt-1.5 text-sm text-ink-muted">
+              Anmelden mit deiner Email-Adresse. Wir schicken dir einen einmaligen Login-Link.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="email" className="label-soft mb-2 block">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="du@example.com"
+              className="glass-input"
+              disabled={status === 'loading'}
+            />
+          </div>
+
+          {status === 'error' && (
+            <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700">
+              {errorMsg}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={status === 'loading' || !email}
+            className="btn-primary w-full"
+          >
+            {status === 'loading' ? 'Senden…' : 'Magic-Link senden'}
+          </button>
+        </form>
+      )}
+    </AuthShell>
   )
 }
