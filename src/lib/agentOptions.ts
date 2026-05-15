@@ -1,6 +1,6 @@
 // Curated option lists for Customer-Self-Service agent configuration.
-// These are kept narrow on purpose — we don't want customers picking obscure
-// or expensive models. Admin can always patch to anything via raw API.
+// IDs verified directly against ElevenLabs Convai validation endpoint
+// on 2026-05-15 — these are the actually-supported strings.
 
 export type LanguageOption = {
   code: string // ISO 639-1
@@ -35,7 +35,8 @@ export function languageName(code: string | null | undefined): string {
   return LANGUAGES.find((l) => l.code === code)?.name ?? code.toUpperCase()
 }
 
-// ElevenLabs TTS models — curated to the 3 most useful options.
+// ElevenLabs TTS models — verified IDs from the Convai validation endpoint.
+// Ordered newest → oldest, conversational-optimised first.
 export type TtsModelOption = {
   id: string
   name: string
@@ -44,19 +45,29 @@ export type TtsModelOption = {
 
 export const TTS_MODELS: TtsModelOption[] = [
   {
-    id: 'eleven_turbo_v2_5',
-    name: 'Turbo v2.5',
-    description: 'Schnellste Latenz. Multilingual. Empfohlen für Live-Anrufe.',
+    id: 'eleven_v3_conversational',
+    name: 'v3 Conversational (Alpha)',
+    description: 'Neueste Generation, optimiert für Live-Anrufe. Expressiv und natürlich.',
   },
   {
-    id: 'eleven_multilingual_v2',
-    name: 'Multilingual v2',
-    description: 'Höchste Qualität, etwas langsamer. Für Premium-Stimmen.',
+    id: 'eleven_v3',
+    name: 'v3 (Alpha)',
+    description: 'Maximale Ausdrucksstärke. Unterstützt Audio-Tags wie [lacht]. Etwas höhere Latenz.',
+  },
+  {
+    id: 'eleven_turbo_v2_5',
+    name: 'Turbo v2.5',
+    description: 'Schnellste Latenz, multilingual. Bewährter Standard für Live-Calls.',
   },
   {
     id: 'eleven_flash_v2_5',
     name: 'Flash v2.5',
-    description: 'Niedrigste Latenz (75ms). Etwas reduzierte Qualität.',
+    description: 'Niedrigste Latenz (~75ms). Etwas reduzierte Qualität.',
+  },
+  {
+    id: 'eleven_multilingual_v2',
+    name: 'Multilingual v2',
+    description: 'Höchste klassische Qualität, etwas langsamer. Für Premium-Stimmen.',
   },
 ]
 
@@ -65,8 +76,8 @@ export function ttsModelName(id: string | null | undefined): string {
   return TTS_MODELS.find((m) => m.id === id)?.name ?? id
 }
 
-// LLM models supported by ElevenLabs Conversational AI.
-// Curated to 6 most relevant.
+// LLM models — verified IDs from ElevenLabs Convai validation endpoint.
+// Curated to the most relevant 14 across providers.
 export type LlmModelOption = {
   id: string
   name: string
@@ -74,35 +85,89 @@ export type LlmModelOption = {
 }
 
 export const LLM_MODELS: LlmModelOption[] = [
+  // ─── OpenAI (newest first) ─────────────────────────────────────
   {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o mini',
-    description: 'Schnell & günstig. Standard für die meisten Anrufe.',
+    id: 'gpt-5.5',
+    name: 'GPT-5.5',
+    description: 'OpenAIs neuestes Flagship-Modell (April 2026). Höchste Qualität.',
+  },
+  {
+    id: 'gpt-5.4',
+    name: 'GPT-5.4',
+    description: 'Sehr starkes Reasoning, etwas schneller als 5.5.',
+  },
+  {
+    id: 'gpt-5.4-mini',
+    name: 'GPT-5.4 mini',
+    description: 'Schnelle und günstige 5.4-Variante. Guter Allrounder.',
+  },
+  {
+    id: 'gpt-5.2',
+    name: 'GPT-5.2',
+    description: 'Bewährt und stabil. Wird auch in unserem Telefon-Agenten Patricia verwendet.',
+  },
+  {
+    id: 'gpt-5-mini',
+    name: 'GPT-5 mini',
+    description: 'Schneller GPT-5 für einfache Flows. Sehr günstig pro Anruf.',
+  },
+  {
+    id: 'gpt-5-nano',
+    name: 'GPT-5 nano',
+    description: 'Kleinste GPT-5-Variante. Minimal-Kosten bei einfachen Aufgaben.',
   },
   {
     id: 'gpt-4o',
     name: 'GPT-4o',
-    description: 'Höhere Qualität, etwas langsamer.',
+    description: 'Älteres Flagship, bewährt, gute Multimodal-Fähigkeiten.',
   },
   {
-    id: 'claude-3-5-sonnet',
-    name: 'Claude 3.5 Sonnet',
-    description: 'Exzellent für komplexe Konversationen.',
+    id: 'gpt-4o-mini',
+    name: 'GPT-4o mini',
+    description: 'Sehr günstig. Akzeptabel für simple Q&A.',
+  },
+  // ─── Anthropic ─────────────────────────────────────────────────
+  {
+    id: 'claude-opus-4-7',
+    name: 'Claude Opus 4.7',
+    description: 'Anthropics stärkstes Modell. Exzellent für komplexe Konversationen.',
   },
   {
-    id: 'claude-3-haiku',
-    name: 'Claude 3 Haiku',
-    description: 'Sehr schnell, gut für einfache Flows.',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
+    description: 'Top-Balance zwischen Qualität und Geschwindigkeit.',
   },
   {
-    id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0 Flash',
-    description: 'Sehr schnell und multilingual.',
+    id: 'claude-sonnet-4-5',
+    name: 'Claude Sonnet 4.5',
+    description: 'Stabile etwas ältere Sonnet-Variante.',
   },
   {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    description: 'Stabile, schnelle Variante von Google.',
+    id: 'claude-haiku-4-5',
+    name: 'Claude Haiku 4.5',
+    description: 'Sehr schnelles Claude für einfache Flows.',
+  },
+  // ─── Google ────────────────────────────────────────────────────
+  {
+    id: 'gemini-3-pro-preview',
+    name: 'Gemini 3 Pro (Preview)',
+    description: 'Googles neuestes Flagship. Sehr starke Multilingualität.',
+  },
+  {
+    id: 'gemini-3-flash-preview',
+    name: 'Gemini 3 Flash (Preview)',
+    description: 'Schnelle 3er-Variante. Niedrige Latenz.',
+  },
+  {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    description: 'Bewährt, stabil, schnell. Gute Default-Wahl bei Google.',
+  },
+  // ─── xAI ───────────────────────────────────────────────────────
+  {
+    id: 'grok-beta',
+    name: 'Grok (Beta)',
+    description: 'xAIs Modell. Etwas eigenwilliger Ton.',
   },
 ]
 
