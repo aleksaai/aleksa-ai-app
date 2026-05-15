@@ -1,15 +1,20 @@
 // admin-update-agent-config Edge Function
-// Patches ElevenLabs agent config for a voice_agent.
-// Supported fields (all optional):
-//   - prompt              → conversation_config.agent.prompt.prompt
-//   - first_message       → conversation_config.agent.first_message
-//   - voice_id            → conversation_config.tts.voice_id
-//   - language            → conversation_config.agent.language
-//   - tts_model_id        → conversation_config.tts.model_id
-//   - llm_model_id        → conversation_config.agent.prompt.llm
-//   - language_presets    → conversation_config.language_presets  (full replace)
+// Patches agent configuration. Platform-aware: ElevenLabs + Retell AI.
 //
-// Uses PATCH /v1/convai/agents/{id} with the stored integration API key.
+// Common body fields (all optional):
+//   - prompt              → ElevenLabs: agent.prompt.prompt
+//                           Retell:     retell-llm.general_prompt (separate PATCH)
+//   - first_message       → ElevenLabs: agent.first_message
+//                           Retell:     agent.begin_message
+//   - voice_id            → ElevenLabs: tts.voice_id
+//                           Retell:     agent.voice_id
+//   - language            → ElevenLabs: agent.language (e.g. "de")
+//                           Retell:     agent.language  (e.g. "de-DE")
+//   - tts_model_id        → ElevenLabs: tts.model_id
+//                           Retell:     agent.voice_model
+//   - llm_model_id        → ElevenLabs: agent.prompt.llm
+//                           Retell:     retell-llm.model (separate PATCH)
+//   - language_presets    → ElevenLabs only
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -22,10 +27,6 @@ const cors = {
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...cors } })
-}
-
-function elevenlabsBase(_region: string | null): string {
-  return 'https://api.elevenlabs.io'
 }
 
 Deno.serve(async (req) => {
@@ -80,7 +81,6 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (!agent) return json({ error: 'agent_not_found' }, 404)
 
-    // Admin: full access. Customer-Owner: must own agent + have can_edit_agent_config permission.
     if (profile.role !== 'admin') {
       if (profile.role !== 'customer_owner' || agent.customer_id !== profile.customer_id) {
         return json({ error: 'forbidden' }, 403)
@@ -92,48 +92,110 @@ Deno.serve(async (req) => {
 
     const integration = (agent as any).integrations
     if (!integration) return json({ error: 'no_integration' }, 400)
-    if (integration.platform !== 'elevenlabs') {
-      return json({ error: 'platform_not_yet_supported', platform: integration.platform }, 501)
+
+    // ─── ElevenLabs ─────────────────────────────────────────────
+    if (integration.platform === 'elevenlabs') {
+      const conversationConfig: any = {}
+      const agentSub: any = {}
+      const promptSub: any = {}
+      const ttsSub: any = {}
+      if (prompt !== undefined) promptSub.prompt = prompt
+      if (llm_model_id !== undefined) promptSub.llm = llm_model_id
+      if (Object.keys(promptSub).length > 0) agentSub.prompt = promptSub
+      if (first_message !== undefined) agentSub.first_message = first_message
+      if (language !== undefined) agentSub.language = language
+      if (Object.keys(agentSub).length > 0) conversationConfig.agent = agentSub
+      if (voice_id !== undefined) ttsSub.voice_id = voice_id
+      if (tts_model_id !== undefined) ttsSub.model_id = tts_model_id
+      if (Object.keys(ttsSub).length > 0) conversationConfig.tts = ttsSub
+      if (language_presets !== undefined) conversationConfig.language_presets = language_presets
+
+      const res = await fetch(
+        `https://api.elevenlabs.io/v1/convai/agents/${agent.platform_agent_id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': integration.api_key,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ conversation_config: conversationConfig }),
+        },
+      )
+      if (!res.ok) return json({ error: 'elevenlabs_patch_failed', detail: await res.text() }, res.status)
+      const updated = await res.json()
+      return json({ ok: true, platform: 'elevenlabs', agent_id: agent.platform_agent_id, updated_at: updated.metadata?.updated_at_unix_secs ?? null })
     }
 
-    // Build conversation_config patch
-    const conversationConfig: any = {}
-    const agentSub: any = {}
-    const promptSub: any = {}
-    const ttsSub: any = {}
+    // ─── Retell AI ──────────────────────────────────────────────
+    if (integration.platform === 'retellai') {
+      const errors: string[] = []
 
-    if (prompt !== undefined) promptSub.prompt = prompt
-    if (llm_model_id !== undefined) promptSub.llm = llm_model_id
-    if (Object.keys(promptSub).length > 0) agentSub.prompt = promptSub
+      // Agent-level fields
+      const agentPatch: any = {}
+      if (voice_id !== undefined) agentPatch.voice_id = voice_id
+      if (tts_model_id !== undefined) agentPatch.voice_model = tts_model_id
+      if (language !== undefined) agentPatch.language = language
+      if (first_message !== undefined) agentPatch.begin_message = first_message
 
-    if (first_message !== undefined) agentSub.first_message = first_message
-    if (language !== undefined) agentSub.language = language
+      if (Object.keys(agentPatch).length > 0) {
+        const res = await fetch(
+          `https://api.retellai.com/update-agent/${agent.platform_agent_id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${integration.api_key}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(agentPatch),
+          },
+        )
+        if (!res.ok) errors.push(`agent: ${await res.text()}`)
+      }
 
-    if (Object.keys(agentSub).length > 0) conversationConfig.agent = agentSub
+      // LLM-level fields (prompt + model) — only if the agent uses retell-llm
+      if (prompt !== undefined || llm_model_id !== undefined) {
+        const aRes = await fetch(
+          `https://api.retellai.com/get-agent/${agent.platform_agent_id}`,
+          { headers: { Authorization: `Bearer ${integration.api_key}` } },
+        )
+        if (!aRes.ok) {
+          errors.push(`agent_lookup_for_llm: ${await aRes.text()}`)
+        } else {
+          const ag = await aRes.json()
+          const re = ag.response_engine ?? {}
+          if (re.type === 'retell-llm' && re.llm_id) {
+            const llmPatch: any = {}
+            if (prompt !== undefined) llmPatch.general_prompt = prompt
+            if (llm_model_id !== undefined) llmPatch.model = llm_model_id
+            const lRes = await fetch(
+              `https://api.retellai.com/update-retell-llm/${re.llm_id}`,
+              {
+                method: 'PATCH',
+                headers: {
+                  Authorization: `Bearer ${integration.api_key}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(llmPatch),
+              },
+            )
+            if (!lRes.ok) errors.push(`retell_llm: ${await lRes.text()}`)
+          } else {
+            errors.push('retell_llm_not_used: prompt/model cannot be patched via Retell because this agent uses a custom external LLM.')
+          }
+        }
+      }
 
-    if (voice_id !== undefined) ttsSub.voice_id = voice_id
-    if (tts_model_id !== undefined) ttsSub.model_id = tts_model_id
-    if (Object.keys(ttsSub).length > 0) conversationConfig.tts = ttsSub
+      if (language_presets !== undefined) {
+        // Not supported on Retell — just ignore silently rather than failing.
+      }
 
-    if (language_presets !== undefined) {
-      conversationConfig.language_presets = language_presets
+      if (errors.length > 0) {
+        return json({ error: 'retell_patch_partial_or_failed', detail: errors.join(' | ') }, 500)
+      }
+      return json({ ok: true, platform: 'retellai', agent_id: agent.platform_agent_id })
     }
 
-    const base = elevenlabsBase(integration.region)
-    const res = await fetch(`${base}/v1/convai/agents/${agent.platform_agent_id}`, {
-      method: 'PATCH',
-      headers: {
-        'xi-api-key': integration.api_key,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ conversation_config: conversationConfig }),
-    })
-
-    if (!res.ok) {
-      return json({ error: 'elevenlabs_patch_failed', detail: await res.text() }, res.status)
-    }
-    const updated = await res.json()
-    return json({ ok: true, agent_id: agent.platform_agent_id, updated_at: updated.metadata?.updated_at_unix_secs ?? null })
+    return json({ error: 'platform_not_supported', platform: integration.platform }, 501)
   } catch (e) {
     return json({ error: 'unexpected', detail: e instanceof Error ? e.message : String(e) }, 500)
   }

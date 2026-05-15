@@ -33,7 +33,7 @@ import { AgentShell, type AgentSection } from '../components/AgentShell'
 import { MiniLineChart } from '../components/MiniLineChart'
 import { CallDetailContent } from '../components/CallDetailContent'
 import { CURATED_VOICES, optimalLanguagesForVoice } from '../lib/curatedVoices'
-import { LANGUAGES, TTS_MODELS, LLM_MODELS, languageName } from '../lib/agentOptions'
+import { getOptionsForPlatform, languageName, type Platform } from '../lib/agentOptions'
 
 type AgentRow = VoiceAgent & {
   customers: Pick<Customer, 'id' | 'name'> | null
@@ -248,6 +248,9 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
     return computeAnalytics(calls, range)
   }, [calls, range])
 
+  // KB is currently only wired for ElevenLabs (Retell has a different KB API)
+  const kbAvailable = (agent?.integrations?.platform ?? 'elevenlabs') === 'elevenlabs'
+
   // ============ SECTIONS ============
   const sections: AgentSection[] = useMemo(() => {
     const list: AgentSection[] = [
@@ -255,10 +258,10 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
     ]
     if (canViewCalls) list.push({ key: 'calls', label: 'Gespräche', icon: <CallsIcon /> })
     if (canEditConfig) list.push({ key: 'config', label: 'Konfiguration', icon: <ConfigIcon /> })
-    if (canEditKb) list.push({ key: 'kb', label: 'Wissensbasis', icon: <KbIcon /> })
+    if (canEditKb && kbAvailable) list.push({ key: 'kb', label: 'Wissensbasis', icon: <KbIcon /> })
     list.push({ key: 'billing', label: 'Abonnementdetails', icon: <BillingIcon /> })
     return list
-  }, [canViewCalls, canEditConfig, canEditKb])
+  }, [canViewCalls, canEditConfig, canEditKb, kbAvailable])
 
   // If active section no longer accessible, fall back
   useEffect(() => {
@@ -508,6 +511,7 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
       {activeSection === 'config' && canEditConfig && (
         <form onSubmit={handleSave} className="space-y-4">
           <ConfigView
+            platform={(agent.integrations?.platform ?? 'elevenlabs') as Platform}
             firstMessage={firstMessage}
             onFirstMessageChange={setFirstMessage}
             prompt={prompt}
@@ -851,6 +855,7 @@ function CallsView({
 type ConfigTab = 'prompt' | 'voice' | 'language' | 'models'
 
 function ConfigView({
+  platform,
   firstMessage,
   onFirstMessageChange,
   prompt,
@@ -871,6 +876,7 @@ function ConfigView({
   extraLanguages,
   onExtraLanguagesChange,
 }: {
+  platform: Platform
   firstMessage: string
   onFirstMessageChange: (v: string) => void
   prompt: string
@@ -891,6 +897,8 @@ function ConfigView({
   extraLanguages: string[]
   onExtraLanguagesChange: (v: string[]) => void
 }) {
+  const { languages: LANGUAGES, ttsModels: TTS_MODELS, llmModels: LLM_MODELS } = getOptionsForPlatform(platform)
+  const isRetell = platform === 'retellai'
   const [tab, setTab] = useState<ConfigTab>('prompt')
   const [addVoiceOpen, setAddVoiceOpen] = useState(false)
   const [newVoiceId, setNewVoiceId] = useState('')
@@ -1208,7 +1216,13 @@ function ConfigView({
 
               <div className="glass-card p-6">
                 <label className="label-soft mb-2 block">Zusätzliche Sprachen</label>
-                {availableLanguages.length === 1 ? (
+                {isRetell ? (
+                  <p className="text-xs text-ink-muted">
+                    Retell AI unterstützt keine zusätzlichen Sprachen pro Agent. Wenn du
+                    mehrsprachig bedienen willst, wähle <strong>Multilingual (Auto-Detect)</strong>{' '}
+                    als Primärsprache.
+                  </p>
+                ) : availableLanguages.length === 1 ? (
                   <p className="text-xs text-ink-muted">
                     Die aktuell ausgewählte Stimme unterstützt nur eine Sprache.
                   </p>

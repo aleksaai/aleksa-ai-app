@@ -1,10 +1,5 @@
 // admin-get-voice Edge Function
-// Fetches a single ElevenLabs voice by ID (works for both workspace voices
-// and shared/premade library voices). Used by the customer voice picker
-// to add custom voices via voice_id input.
-//
-// Body: { integration_id: string, voice_id: string }
-// Returns: { ok: true, voice: Voice }
+// Fetches a single voice by ID. Platform-aware: ElevenLabs + Retell AI.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -49,23 +44,17 @@ Deno.serve(async (req) => {
       return json({ error: 'missing_params', detail: 'integration_id + voice_id required' }, 400)
     }
 
-    // Look up integration. Customers can only use integrations linked to
-    // their voice_agents — verify ownership.
     const { data: integration } = await supabaseAdmin
       .from('integrations')
       .select('id, api_key, platform, region')
       .eq('id', integration_id)
       .maybeSingle()
     if (!integration) return json({ error: 'integration_not_found' }, 404)
-    if (integration.platform !== 'elevenlabs') {
-      return json({ error: 'platform_not_supported', platform: integration.platform }, 501)
-    }
 
     if (profile.role !== 'admin') {
       if (profile.role !== 'customer_owner' || !profile.customer_id) {
         return json({ error: 'forbidden' }, 403)
       }
-      // Customer must have at least one agent on this integration
       const { data: agent } = await supabaseAdmin
         .from('voice_agents')
         .select('id')
@@ -76,37 +65,66 @@ Deno.serve(async (req) => {
       if (!agent) return json({ error: 'forbidden' }, 403)
     }
 
-    // Fetch voice from ElevenLabs
-    const res = await fetch(`https://api.elevenlabs.io/v1/voices/${encodeURIComponent(voice_id)}`, {
-      headers: { 'xi-api-key': integration.api_key },
-    })
-    if (!res.ok) {
-      const detail = await res.text()
-      if (res.status === 404) {
-        return json({ error: 'voice_not_found', detail: 'Diese Voice-ID existiert nicht in deinem Account.' }, 404)
+    // ─── ElevenLabs ─────────────────────────────────────────────
+    if (integration.platform === 'elevenlabs') {
+      const res = await fetch(`https://api.elevenlabs.io/v1/voices/${encodeURIComponent(voice_id)}`, {
+        headers: { 'xi-api-key': integration.api_key },
+      })
+      if (!res.ok) {
+        if (res.status === 404) {
+          return json({ error: 'voice_not_found', detail: 'Diese Voice-ID existiert nicht in deinem Account.' }, 404)
+        }
+        return json({ error: 'elevenlabs_fetch_failed', detail: await res.text() }, res.status)
       }
-      return json({ error: 'elevenlabs_fetch_failed', detail }, res.status)
-    }
-    const v = await res.json()
-
-    // Normalise to our Voice shape
-    const labels: Record<string, string> = {}
-    if (v.labels && typeof v.labels === 'object') {
-      for (const [k, val] of Object.entries(v.labels)) {
-        if (typeof val === 'string') labels[k] = val
+      const v = await res.json()
+      const labels: Record<string, string> = {}
+      if (v.labels && typeof v.labels === 'object') {
+        for (const [k, val] of Object.entries(v.labels)) {
+          if (typeof val === 'string') labels[k] = val
+        }
       }
+      return json({
+        ok: true,
+        voice: {
+          voice_id: v.voice_id,
+          name: v.name ?? 'Unbenannte Stimme',
+          labels,
+          preview_url: v.preview_url ?? null,
+          category: v.category ?? null,
+        },
+      })
     }
 
-    return json({
-      ok: true,
-      voice: {
-        voice_id: v.voice_id,
-        name: v.name ?? 'Unbenannte Stimme',
-        labels,
-        preview_url: v.preview_url ?? null,
-        category: v.category ?? null,
-      },
-    })
+    // ─── Retell AI ──────────────────────────────────────────────
+    // Retell has no GET-by-id endpoint for voices, so we list and filter.
+    if (integration.platform === 'retellai') {
+      const res = await fetch('https://api.retellai.com/list-voices', {
+        headers: { Authorization: `Bearer ${integration.api_key}` },
+      })
+      if (!res.ok) return json({ error: 'retell_fetch_failed', detail: await res.text() }, res.status)
+      const list = await res.json()
+      const v = (Array.isArray(list) ? list : []).find((x: any) => x.voice_id === voice_id)
+      if (!v) {
+        return json({ error: 'voice_not_found', detail: 'Diese Voice-ID existiert nicht in der Retell-Liste.' }, 404)
+      }
+      return json({
+        ok: true,
+        voice: {
+          voice_id: v.voice_id,
+          name: v.voice_name ?? v.voice_id,
+          labels: {
+            ...(v.provider ? { provider: v.provider } : {}),
+            ...(v.gender ? { gender: v.gender } : {}),
+            ...(v.accent ? { accent: v.accent } : {}),
+            ...(v.age ? { age: v.age } : {}),
+          },
+          preview_url: v.preview_audio_url ?? null,
+          category: v.provider ?? null,
+        },
+      })
+    }
+
+    return json({ error: 'platform_not_supported', platform: integration.platform }, 501)
   } catch (e) {
     return json({ error: 'unexpected', detail: e instanceof Error ? e.message : String(e) }, 500)
   }

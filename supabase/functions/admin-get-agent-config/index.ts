@@ -1,6 +1,6 @@
 // admin-get-agent-config Edge Function
-// Fetches the live ElevenLabs configuration for a voice_agent (prompt, first_message,
-// voice_id, llm, etc.) using the stored integration API key (server-side).
+// Returns the live agent configuration (prompt, voice, language, models, …)
+// normalised across ElevenLabs and Retell AI.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -13,11 +13,6 @@ const cors = {
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...cors } })
-}
-
-function elevenlabsBase(_region: string | null): string {
-  // Switch to api.eu.residency.elevenlabs.io once Enterprise upgrade happens.
-  return 'https://api.elevenlabs.io'
 }
 
 Deno.serve(async (req) => {
@@ -54,8 +49,6 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (!agent) return json({ error: 'agent_not_found' }, 404)
 
-    // Admin can read any agent; customer_owner only their own (read is permission-free,
-    // but they must own the agent)
     if (profile.role !== 'admin') {
       if (profile.role !== 'customer_owner' || agent.customer_id !== profile.customer_id) {
         return json({ error: 'forbidden' }, 403)
@@ -64,41 +57,89 @@ Deno.serve(async (req) => {
 
     const integration = (agent as any).integrations
     if (!integration) return json({ error: 'no_integration' }, 400)
-    if (integration.platform !== 'elevenlabs') {
-      return json({ error: 'platform_not_yet_supported', platform: integration.platform }, 501)
+
+    // ─── ElevenLabs ─────────────────────────────────────────────
+    if (integration.platform === 'elevenlabs') {
+      const res = await fetch(
+        `https://api.elevenlabs.io/v1/convai/agents/${agent.platform_agent_id}`,
+        { headers: { 'xi-api-key': integration.api_key } },
+      )
+      if (!res.ok) return json({ error: 'elevenlabs_fetch_failed', detail: await res.text() }, 500)
+      const cfg = await res.json()
+      const agentCfg = cfg.conversation_config?.agent ?? {}
+      const ttsCfg = cfg.conversation_config?.tts ?? {}
+      const promptCfg = agentCfg.prompt ?? {}
+      return json({
+        ok: true,
+        platform: 'elevenlabs',
+        agent_id: agent.platform_agent_id,
+        name: cfg.name,
+        prompt: promptCfg.prompt ?? '',
+        llm: promptCfg.llm ?? null,
+        first_message: agentCfg.first_message ?? '',
+        language: agentCfg.language ?? null,
+        voice_id: ttsCfg.voice_id ?? null,
+        tts_model: ttsCfg.model_id ?? null,
+        stability: ttsCfg.stability ?? null,
+        similarity_boost: ttsCfg.similarity_boost ?? null,
+        language_presets: cfg.conversation_config?.language_presets ?? {},
+        knowledge_base: promptCfg.knowledge_base ?? [],
+        rag_enabled: promptCfg.rag?.enabled ?? false,
+      })
     }
 
-    const base = elevenlabsBase(integration.region)
-    const res = await fetch(`${base}/v1/convai/agents/${agent.platform_agent_id}`, {
-      headers: { 'xi-api-key': integration.api_key },
-    })
-    if (!res.ok) {
-      return json({ error: 'elevenlabs_fetch_failed', detail: await res.text() }, 500)
-    }
-    const cfg = await res.json()
+    // ─── Retell AI ──────────────────────────────────────────────
+    if (integration.platform === 'retellai') {
+      // 1. Get the agent
+      const aRes = await fetch(
+        `https://api.retellai.com/get-agent/${agent.platform_agent_id}`,
+        { headers: { Authorization: `Bearer ${integration.api_key}` } },
+      )
+      if (!aRes.ok) return json({ error: 'retell_agent_fetch_failed', detail: await aRes.text() }, 500)
+      const ag = await aRes.json()
 
-    // Return the bits we expose in the UI
-    const agentCfg = cfg.conversation_config?.agent ?? {}
-    const ttsCfg = cfg.conversation_config?.tts ?? {}
-    const promptCfg = agentCfg.prompt ?? {}
-    return json({
-      ok: true,
-      agent_id: agent.platform_agent_id,
-      name: cfg.name,
-      prompt: promptCfg.prompt ?? '',
-      llm: promptCfg.llm ?? null,
-      first_message: agentCfg.first_message ?? '',
-      language: agentCfg.language ?? null,
-      voice_id: ttsCfg.voice_id ?? null,
-      tts_model: ttsCfg.model_id ?? null,
-      stability: ttsCfg.stability ?? null,
-      similarity_boost: ttsCfg.similarity_boost ?? null,
-      // Multi-language
-      language_presets: cfg.conversation_config?.language_presets ?? {},
-      // Knowledge Base
-      knowledge_base: promptCfg.knowledge_base ?? [],
-      rag_enabled: promptCfg.rag?.enabled ?? false,
-    })
+      // 2. If the agent uses a Retell LLM (not a custom external LLM),
+      //    fetch the LLM resource to expose prompt + model.
+      let llmModel: string | null = null
+      let llmPrompt = ''
+      let llmId: string | null = null
+      const respEngine = ag.response_engine ?? {}
+      if (respEngine.type === 'retell-llm' && respEngine.llm_id) {
+        llmId = respEngine.llm_id
+        const lRes = await fetch(
+          `https://api.retellai.com/get-retell-llm/${respEngine.llm_id}`,
+          { headers: { Authorization: `Bearer ${integration.api_key}` } },
+        )
+        if (lRes.ok) {
+          const ll = await lRes.json()
+          llmModel = ll.model ?? null
+          llmPrompt = ll.general_prompt ?? ''
+        }
+      }
+
+      return json({
+        ok: true,
+        platform: 'retellai',
+        agent_id: agent.platform_agent_id,
+        name: ag.agent_name ?? null,
+        prompt: llmPrompt,
+        llm: llmModel,
+        first_message: ag.begin_message ?? '',
+        language: ag.language ?? null,
+        voice_id: ag.voice_id ?? null,
+        tts_model: ag.voice_model ?? null,
+        stability: null,
+        similarity_boost: ag.voice_temperature ?? null,
+        language_presets: {},
+        knowledge_base: [],
+        rag_enabled: false,
+        // Retell-specific extras so the frontend can patch back correctly
+        retell_llm_id: llmId,
+        retell_response_engine_type: respEngine.type ?? null,
+      })
+    }
+
+    return json({ error: 'platform_not_supported', platform: integration.platform }, 501)
   } catch (e) {
     return json({ error: 'unexpected', detail: e instanceof Error ? e.message : String(e) }, 500)
   }

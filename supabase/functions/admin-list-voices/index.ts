@@ -1,6 +1,6 @@
 // admin-list-voices Edge Function
-// Lists available ElevenLabs voices for a given integration. Used by the
-// Voice-Picker UI in the agent detail page.
+// Lists available voices for a given integration.
+// Platform-aware: ElevenLabs + Retell AI.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -13,10 +13,6 @@ const cors = {
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...cors } })
-}
-
-function elevenlabsBase(_region: string | null): string {
-  return 'https://api.elevenlabs.io'
 }
 
 Deno.serve(async (req) => {
@@ -46,7 +42,6 @@ Deno.serve(async (req) => {
     const integration_id = (body.integration_id ?? '').toString().trim()
     if (!integration_id) return json({ error: 'integration_id_required' }, 400)
 
-    // Customer-Owner: needs can_edit_agent_config AND must own a voice_agent using this integration
     if (profile.role !== 'admin') {
       if (profile.role !== 'customer_owner') return json({ error: 'forbidden' }, 403)
       const { data: perms } = await supabaseAdmin
@@ -60,26 +55,47 @@ Deno.serve(async (req) => {
     const { data: integration } = await supabaseAdmin
       .from('integrations').select('api_key, platform, region').eq('id', integration_id).maybeSingle()
     if (!integration) return json({ error: 'integration_not_found' }, 404)
-    if (integration.platform !== 'elevenlabs') {
-      return json({ error: 'platform_not_yet_supported' }, 501)
+
+    // ─── ElevenLabs ─────────────────────────────────────────────
+    if (integration.platform === 'elevenlabs') {
+      const res = await fetch(`https://api.elevenlabs.io/v1/voices`, {
+        headers: { 'xi-api-key': integration.api_key },
+      })
+      if (!res.ok) return json({ error: 'elevenlabs_voices_fetch_failed', detail: await res.text() }, 500)
+      const data = await res.json()
+      const voices = (data.voices ?? []).map((v: any) => ({
+        voice_id: v.voice_id,
+        name: v.name,
+        labels: v.labels ?? {},
+        preview_url: v.preview_url ?? null,
+        category: v.category ?? null,
+      }))
+      return json({ ok: true, voices })
     }
 
-    const base = elevenlabsBase(integration.region)
-    const res = await fetch(`${base}/v1/voices`, {
-      headers: { 'xi-api-key': integration.api_key },
-    })
-    if (!res.ok) {
-      return json({ error: 'elevenlabs_voices_fetch_failed', detail: await res.text() }, 500)
+    // ─── Retell AI ──────────────────────────────────────────────
+    if (integration.platform === 'retellai') {
+      const res = await fetch('https://api.retellai.com/list-voices', {
+        headers: { Authorization: `Bearer ${integration.api_key}` },
+      })
+      if (!res.ok) return json({ error: 'retell_voices_fetch_failed', detail: await res.text() }, 500)
+      const data = await res.json()
+      const voices = (Array.isArray(data) ? data : []).map((v: any) => ({
+        voice_id: v.voice_id,
+        name: v.voice_name ?? v.voice_id,
+        labels: {
+          ...(v.provider ? { provider: v.provider } : {}),
+          ...(v.gender ? { gender: v.gender } : {}),
+          ...(v.accent ? { accent: v.accent } : {}),
+          ...(v.age ? { age: v.age } : {}),
+        },
+        preview_url: v.preview_audio_url ?? null,
+        category: v.provider ?? null,
+      }))
+      return json({ ok: true, voices })
     }
-    const voicesBody = await res.json()
-    const voices = (voicesBody.voices ?? []).map((v: any) => ({
-      voice_id: v.voice_id,
-      name: v.name,
-      labels: v.labels ?? {},
-      preview_url: v.preview_url ?? null,
-      category: v.category ?? null,
-    }))
-    return json({ ok: true, voices })
+
+    return json({ error: 'platform_not_supported', platform: integration.platform }, 501)
   } catch (e) {
     return json({ error: 'unexpected', detail: e instanceof Error ? e.message : String(e) }, 500)
   }

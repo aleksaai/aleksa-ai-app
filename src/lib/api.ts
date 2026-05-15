@@ -236,6 +236,7 @@ export type KBEntry = {
 
 export type AgentConfig = {
   ok: true
+  platform: 'elevenlabs' | 'retellai'
   agent_id: string
   name: string | null
   prompt: string
@@ -249,6 +250,9 @@ export type AgentConfig = {
   language_presets: Record<string, unknown>
   knowledge_base: KBEntry[]
   rag_enabled: boolean
+  // Retell-only optional extras
+  retell_llm_id?: string | null
+  retell_response_engine_type?: string | null
 }
 
 export async function adminGetAgentConfig(voice_agent_id: string): Promise<AgentConfig> {
