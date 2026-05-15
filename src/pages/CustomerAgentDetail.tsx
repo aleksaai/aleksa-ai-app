@@ -32,6 +32,7 @@ import { AgentShell, type AgentSection } from '../components/AgentShell'
 import { MiniLineChart } from '../components/MiniLineChart'
 import { CallDetailContent } from '../components/CallDetailContent'
 import { CURATED_VOICES } from '../lib/curatedVoices'
+import { LANGUAGES, TTS_MODELS, LLM_MODELS } from '../lib/agentOptions'
 
 type AgentRow = VoiceAgent & {
   customers: Pick<Customer, 'id' | 'name'> | null
@@ -84,6 +85,10 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
   const [selectedVoice, setSelectedVoice] = useState('')
   const [voices, setVoices] = useState<Voice[]>([])
   const [voicesLoading, setVoicesLoading] = useState(false)
+  const [language, setLanguage] = useState<string>('')
+  const [ttsModel, setTtsModel] = useState<string>('')
+  const [llmModel, setLlmModel] = useState<string>('')
+  const [extraLanguages, setExtraLanguages] = useState<string[]>([])
 
   // KB
   const [workspaceKb, setWorkspaceKb] = useState<KBDoc[]>([])
@@ -167,6 +172,10 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
       setPrompt(cfg.prompt)
       setFirstMessage(cfg.first_message)
       setSelectedVoice(cfg.voice_id ?? '')
+      setLanguage(cfg.language ?? '')
+      setTtsModel(cfg.tts_model ?? '')
+      setLlmModel(cfg.llm ?? '')
+      setExtraLanguages(Object.keys(cfg.language_presets ?? {}))
       setAssignedKb(cfg.knowledge_base ?? [])
       setRagEnabled(cfg.rag_enabled ?? false)
     } catch (e) {
@@ -250,11 +259,24 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
   }
 
   // ============ SAVE HANDLERS (config + kb) ============
+  const extraLanguagesChanged = (() => {
+    if (!config) return false
+    const current = new Set(extraLanguages)
+    const original = new Set(Object.keys(config.language_presets ?? {}))
+    if (current.size !== original.size) return true
+    for (const c of current) if (!original.has(c)) return true
+    return false
+  })()
+
   const configChanged =
     config !== null &&
     (prompt !== config.prompt ||
       firstMessage !== config.first_message ||
-      (selectedVoice !== '' && selectedVoice !== config.voice_id))
+      (selectedVoice !== '' && selectedVoice !== config.voice_id) ||
+      (language !== '' && language !== (config.language ?? '')) ||
+      (ttsModel !== '' && ttsModel !== (config.tts_model ?? '')) ||
+      (llmModel !== '' && llmModel !== (config.llm ?? '')) ||
+      extraLanguagesChanged)
 
   const kbChanged =
     config !== null &&
@@ -271,12 +293,34 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
     setSaveError('')
     try {
       if (canEditConfig && configChanged) {
-        const patch: { voice_agent_id: string; prompt?: string; first_message?: string; voice_id?: string } = {
+        const patch: {
+          voice_agent_id: string
+          prompt?: string
+          first_message?: string
+          voice_id?: string
+          language?: string
+          tts_model_id?: string
+          llm_model_id?: string
+          language_presets?: Record<string, unknown>
+        } = {
           voice_agent_id: id,
         }
         if (prompt !== config.prompt) patch.prompt = prompt
         if (firstMessage !== config.first_message) patch.first_message = firstMessage
         if (selectedVoice && selectedVoice !== config.voice_id) patch.voice_id = selectedVoice
+        if (language !== '' && language !== (config.language ?? '')) patch.language = language
+        if (ttsModel !== '' && ttsModel !== (config.tts_model ?? '')) patch.tts_model_id = ttsModel
+        if (llmModel !== '' && llmModel !== (config.llm ?? '')) patch.llm_model_id = llmModel
+        if (extraLanguagesChanged) {
+          // Build language_presets: keep existing entries for languages still in the list,
+          // add new languages with empty preset objects (inherits base config).
+          const existingPresets = (config.language_presets ?? {}) as Record<string, unknown>
+          const next: Record<string, unknown> = {}
+          for (const code of extraLanguages) {
+            next[code] = existingPresets[code] ?? {}
+          }
+          patch.language_presets = next
+        }
         if (Object.keys(patch).length > 1) await adminUpdateAgentConfig(patch)
       }
       if (canEditKb && kbChanged) {
@@ -289,6 +333,10 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
       setSavedAt(Date.now())
       const cfg = await adminGetAgentConfig(id)
       setConfig(cfg)
+      setLanguage(cfg.language ?? '')
+      setTtsModel(cfg.tts_model ?? '')
+      setLlmModel(cfg.llm ?? '')
+      setExtraLanguages(Object.keys(cfg.language_presets ?? {}))
       setAssignedKb(cfg.knowledge_base ?? [])
       setRagEnabled(cfg.rag_enabled ?? false)
     } catch (e) {
@@ -442,7 +490,14 @@ export function CustomerAgentDetail({ isAdminPreview, agentIdOverride }: Props =
             selectedVoice={selectedVoice}
             onVoiceChange={setSelectedVoice}
             currentVoiceId={config?.voice_id ?? null}
-            language={config?.language ?? null}
+            language={language}
+            onLanguageChange={setLanguage}
+            ttsModel={ttsModel}
+            onTtsModelChange={setTtsModel}
+            llmModel={llmModel}
+            onLlmModelChange={setLlmModel}
+            extraLanguages={extraLanguages}
+            onExtraLanguagesChange={setExtraLanguages}
           />
           {saveError && (
             <div className="rounded-xl border border-red-200 bg-red-50/80 p-4 text-sm text-red-700">
@@ -775,6 +830,13 @@ function ConfigView({
   onVoiceChange,
   currentVoiceId,
   language,
+  onLanguageChange,
+  ttsModel,
+  onTtsModelChange,
+  llmModel,
+  onLlmModelChange,
+  extraLanguages,
+  onExtraLanguagesChange,
 }: {
   firstMessage: string
   onFirstMessageChange: (v: string) => void
@@ -785,17 +847,122 @@ function ConfigView({
   selectedVoice: string
   onVoiceChange: (id: string) => void
   currentVoiceId: string | null
-  language: string | null
+  language: string
+  onLanguageChange: (v: string) => void
+  ttsModel: string
+  onTtsModelChange: (v: string) => void
+  llmModel: string
+  onLlmModelChange: (v: string) => void
+  extraLanguages: string[]
+  onExtraLanguagesChange: (v: string[]) => void
 }) {
+  const toggleExtraLang = (code: string) => {
+    if (code === language) return // can't be primary AND extra
+    if (extraLanguages.includes(code)) {
+      onExtraLanguagesChange(extraLanguages.filter((c) => c !== code))
+    } else {
+      onExtraLanguagesChange([...extraLanguages, code])
+    }
+  }
+
   return (
     <div className="space-y-4">
-      {language && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="pill-neutral">
-            <GlobeIcon /> {language}
-          </span>
+      {/* Sprache + Modelle */}
+      <div className="glass-card p-6 space-y-5">
+        <div>
+          <label className="label-soft mb-2 block">Primärsprache</label>
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange(e.target.value)}
+            className="glass-input cursor-pointer"
+          >
+            <option value="" disabled>— wählen —</option>
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-ink-muted">
+            Die Hauptsprache, in der der Agent spricht und versteht.
+          </p>
         </div>
-      )}
+
+        <div>
+          <label className="label-soft mb-2 block">Zusätzliche Sprachen</label>
+          <div className="flex flex-wrap gap-1.5">
+            {LANGUAGES.filter((l) => l.code !== language).map((l) => {
+              const active = extraLanguages.includes(l.code)
+              return (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => toggleExtraLang(l.code)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all ${active ? 'shadow-sm' : ''}`}
+                  style={
+                    active
+                      ? {
+                          background:
+                            'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.25) 0%, rgba(var(--accent-400-rgb), 0.12) 100%)',
+                          color: 'var(--accent-800)',
+                          border: '1px solid rgba(var(--accent-400-rgb), 0.4)',
+                        }
+                      : {
+                          background: 'rgba(255,255,255,0.5)',
+                          color: '#6c6880',
+                          border: '1px solid rgba(255,255,255,0.6)',
+                        }
+                  }
+                >
+                  {l.name}
+                </button>
+              )
+            })}
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">
+            Sprachen, in die der Agent während eines Gesprächs automatisch wechseln kann.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label-soft mb-2 block">TTS-Modell (Stimme)</label>
+            <select
+              value={ttsModel}
+              onChange={(e) => onTtsModelChange(e.target.value)}
+              className="glass-input cursor-pointer"
+            >
+              <option value="" disabled>— wählen —</option>
+              {TTS_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-ink-muted">
+              {TTS_MODELS.find((m) => m.id === ttsModel)?.description ?? 'Bestimmt Latenz und Qualität der Stimme.'}
+            </p>
+          </div>
+          <div>
+            <label className="label-soft mb-2 block">LLM-Modell (Gehirn)</label>
+            <select
+              value={llmModel}
+              onChange={(e) => onLlmModelChange(e.target.value)}
+              className="glass-input cursor-pointer"
+            >
+              <option value="" disabled>— wählen —</option>
+              {LLM_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-ink-muted">
+              {LLM_MODELS.find((m) => m.id === llmModel)?.description ?? 'Bestimmt, wie der Agent versteht und antwortet.'}
+            </p>
+          </div>
+        </div>
+      </div>
 
       <div className="glass-card p-6">
         <label className="label-soft mb-2 block">Begrüßung</label>
@@ -805,6 +972,9 @@ function ConfigView({
           rows={2}
           className="glass-input"
         />
+        <p className="mt-1.5 text-xs text-ink-muted">
+          Was der Agent als erstes sagt, wenn jemand anruft.
+        </p>
       </div>
 
       <div className="glass-card p-6">
@@ -815,6 +985,9 @@ function ConfigView({
           rows={18}
           className="glass-input font-mono text-xs leading-relaxed"
         />
+        <p className="mt-1.5 text-xs text-ink-muted">
+          Verhalten, Persönlichkeit und Regeln des Agenten.
+        </p>
       </div>
 
       <div className="glass-card p-6">
@@ -1315,14 +1488,6 @@ function RefreshIcon() {
       <polyline points="23 4 23 10 17 10" />
       <polyline points="1 20 1 14 7 14" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  )
-}
-function GlobeIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20" />
     </svg>
   )
 }

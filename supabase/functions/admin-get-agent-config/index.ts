@@ -93,6 +93,8 @@ Deno.serve(async (req) => {
       tts_model: ttsCfg.model_id ?? null,
       stability: ttsCfg.stability ?? null,
       similarity_boost: ttsCfg.similarity_boost ?? null,
+      // Multi-language
+      language_presets: cfg.conversation_config?.language_presets ?? {},
       // Knowledge Base
       knowledge_base: promptCfg.knowledge_base ?? [],
       rag_enabled: promptCfg.rag?.enabled ?? false,

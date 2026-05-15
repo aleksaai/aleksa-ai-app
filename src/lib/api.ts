@@ -246,6 +246,7 @@ export type AgentConfig = {
   tts_model: string | null
   stability: number | null
   similarity_boost: number | null
+  language_presets: Record<string, unknown>
   knowledge_base: KBEntry[]
   rag_enabled: boolean
 }
@@ -275,6 +276,10 @@ export type UpdateAgentConfigInput = {
   prompt?: string
   first_message?: string
   voice_id?: string
+  language?: string
+  tts_model_id?: string
+  llm_model_id?: string
+  language_presets?: Record<string, unknown>
 }
 
 export async function adminUpdateAgentConfig(input: UpdateAgentConfigInput) {

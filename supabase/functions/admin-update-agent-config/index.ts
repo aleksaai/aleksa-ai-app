@@ -1,6 +1,15 @@
 // admin-update-agent-config Edge Function
-// Patches ElevenLabs agent config (prompt, first_message, voice_id) for a
-// voice_agent. Uses PATCH /v1/convai/agents/{id} with the stored integration API key.
+// Patches ElevenLabs agent config for a voice_agent.
+// Supported fields (all optional):
+//   - prompt              → conversation_config.agent.prompt.prompt
+//   - first_message       → conversation_config.agent.first_message
+//   - voice_id            → conversation_config.tts.voice_id
+//   - language            → conversation_config.agent.language
+//   - tts_model_id        → conversation_config.tts.model_id
+//   - llm_model_id        → conversation_config.agent.prompt.llm
+//   - language_presets    → conversation_config.language_presets  (full replace)
+//
+// Uses PATCH /v1/convai/agents/{id} with the stored integration API key.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -49,10 +58,20 @@ Deno.serve(async (req) => {
     const prompt = body.prompt as string | undefined
     const first_message = body.first_message as string | undefined
     const voice_id = body.voice_id as string | undefined
+    const language = body.language as string | undefined
+    const tts_model_id = body.tts_model_id as string | undefined
+    const llm_model_id = body.llm_model_id as string | undefined
+    const language_presets = body.language_presets as Record<string, unknown> | undefined
 
-    if (prompt === undefined && first_message === undefined && voice_id === undefined) {
-      return json({ error: 'nothing_to_update' }, 400)
-    }
+    const hasAny =
+      prompt !== undefined ||
+      first_message !== undefined ||
+      voice_id !== undefined ||
+      language !== undefined ||
+      tts_model_id !== undefined ||
+      llm_model_id !== undefined ||
+      language_presets !== undefined
+    if (!hasAny) return json({ error: 'nothing_to_update' }, 400)
 
     const { data: agent } = await supabaseAdmin
       .from('voice_agents')
@@ -79,17 +98,25 @@ Deno.serve(async (req) => {
 
     // Build conversation_config patch
     const conversationConfig: any = {}
-    if (prompt !== undefined || first_message !== undefined) {
-      conversationConfig.agent = {}
-      if (prompt !== undefined) {
-        conversationConfig.agent.prompt = { prompt }
-      }
-      if (first_message !== undefined) {
-        conversationConfig.agent.first_message = first_message
-      }
-    }
-    if (voice_id !== undefined) {
-      conversationConfig.tts = { voice_id }
+    const agentSub: any = {}
+    const promptSub: any = {}
+    const ttsSub: any = {}
+
+    if (prompt !== undefined) promptSub.prompt = prompt
+    if (llm_model_id !== undefined) promptSub.llm = llm_model_id
+    if (Object.keys(promptSub).length > 0) agentSub.prompt = promptSub
+
+    if (first_message !== undefined) agentSub.first_message = first_message
+    if (language !== undefined) agentSub.language = language
+
+    if (Object.keys(agentSub).length > 0) conversationConfig.agent = agentSub
+
+    if (voice_id !== undefined) ttsSub.voice_id = voice_id
+    if (tts_model_id !== undefined) ttsSub.model_id = tts_model_id
+    if (Object.keys(ttsSub).length > 0) conversationConfig.tts = ttsSub
+
+    if (language_presets !== undefined) {
+      conversationConfig.language_presets = language_presets
     }
 
     const base = elevenlabsBase(integration.region)
