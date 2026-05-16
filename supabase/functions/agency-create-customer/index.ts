@@ -48,10 +48,10 @@ Deno.serve(async (req) => {
     if (profile?.role !== 'agency_owner') return json({ error: 'agency_owner_only' }, 403)
     if (!profile.agency_id) return json({ error: 'no_agency_assigned' }, 403)
 
-    // Load agency for branding in email
+    // Load agency for branding in email + Stripe connected-account info
     const { data: agency } = await sbAdmin
       .from('agencies')
-      .select('display_name, slug, custom_domain, max_customers, brand_color, logo_url')
+      .select('display_name, slug, custom_domain, max_customers, brand_color, logo_url, stripe_connect_account_id, stripe_connect_status')
       .eq('id', profile.agency_id)
       .maybeSingle()
     if (!agency) return json({ error: 'agency_not_found' }, 404)
@@ -72,15 +72,51 @@ Deno.serve(async (req) => {
       return json({ error: 'name_and_contact_email_required' }, 400)
     }
 
-    // Insert customer (agency_owner RLS policy permits this because agency_id matches)
+    // Create a Stripe Customer on the partner's connected account (so the
+    // partner can charge them via SetupIntent + subscriptions). Skip silently
+    // if the partner hasn't connected Stripe yet — they can still onboard the
+    // customer; the SetupIntent will fail later with a clear error.
+    let stripeCustomerId: string | null = null
+    let stripeAccountId: string | null = null
+    if (agency.stripe_connect_account_id && agency.stripe_connect_status === 'active') {
+      stripeAccountId = agency.stripe_connect_account_id as string
+      const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!
+      try {
+        const stripeRes = await fetch('https://api.stripe.com/v1/customers', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Stripe-Account': stripeAccountId,
+          },
+          body: new URLSearchParams({
+            name,
+            email: contactEmail,
+            'metadata[source]': 'aleksa-ai-app',
+            'metadata[agency_id]': profile.agency_id,
+          }),
+        })
+        if (stripeRes.ok) {
+          const sc = await stripeRes.json()
+          stripeCustomerId = sc.id as string
+        } else {
+          // Don't fail customer creation just because Stripe hiccupped;
+          // partner can retry assignment later from the customer detail page.
+          console.warn('[agency-create-customer] Stripe customer create failed:', await stripeRes.text())
+        }
+      } catch (e) {
+        console.warn('[agency-create-customer] Stripe customer create exception:', e)
+      }
+    }
+
     const { data: customer, error: custErr } = await sbAdmin
       .from('customers')
       .insert({
         name,
         contact_email: contactEmail,
         agency_id: profile.agency_id,
-        // customer_kind defaults to 'voice_customer' but this is an agency customer;
-        // we keep the value as voice_customer since agency_id=NOT NULL is the new tenant marker
+        stripe_customer_id: stripeCustomerId,
+        stripe_account_id: stripeAccountId,
       })
       .select()
       .single()

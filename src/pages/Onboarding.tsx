@@ -1,13 +1,15 @@
-// Onboarding flow for new community members.
+// Onboarding flow for new community members + partner-invited customers.
 //
-// Old flow (V1 for paying voice-agent customers): linking → password → Stripe SetupIntent → done.
-// New flow (OpenPenguin Voice community perk): linking → password → done.
+// Flow: linking → (password) → (payment) → done
 //
-// Stripe is no longer collected here — community members don't pay Aleksa,
-// they bring their own Stripe + their own ElevenLabs/Retell keys (and
-// charge their own customers later via integrations). When the proper
-// Agency tier ships, this page may grow a Welcome step pointing to
-// /account / /integrations for setup.
+// - linking: link the invitation token to this auth user (creates profile row,
+//   joins customers / community members tables as needed)
+// - password: required only for email-signup users that haven't set one yet
+// - payment: required only for partner-customers (= customer has stripe_customer_id
+//   + stripe_account_id set, meaning the partner has a Stripe Connect account)
+//
+// Pure community-members (Aleksa's master flow, no agency) skip both extra
+// steps and finish straight after linking.
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -16,8 +18,17 @@ import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { linkInvitation } from '../lib/api'
 import { AuthShell } from '../components/AuthShell'
+import { PaymentSetupForm } from '../components/PaymentSetupForm'
 
-type Phase = 'linking' | 'password' | 'success' | 'error'
+type Phase = 'linking' | 'password' | 'payment' | 'success' | 'error'
+
+type CustomerSnapshot = {
+  id: string
+  has_payment_method: boolean
+  stripe_customer_id: string | null
+  stripe_account_id: string | null
+  customer_kind: string | null
+}
 
 export function Onboarding() {
   const { user, signOut } = useAuth()
@@ -25,19 +36,31 @@ export function Onboarding() {
   const [searchParams] = useSearchParams()
   const [phase, setPhase] = useState<Phase>('linking')
   const [errorMsg, setErrorMsg] = useState('')
+  const [customer, setCustomer] = useState<CustomerSnapshot | null>(null)
 
   const finish = () => {
     setPhase('success')
     setTimeout(() => navigate('/'), 1500)
   }
 
+  // After password is set (or skipped), decide whether to collect payment.
+  const continueAfterPassword = (c: CustomerSnapshot | null) => {
+    const needsPayment =
+      !!c &&
+      c.customer_kind === 'voice_customer' &&
+      !!c.stripe_customer_id &&
+      !c.has_payment_method
+    if (needsPayment) {
+      setPhase('payment')
+    } else {
+      finish()
+    }
+  }
+
   useEffect(() => {
     if (!user) return
     const run = async () => {
       try {
-        // Rescue: if this user actually belongs to the agency-onboarding
-        // flow (i.e. invite came from admin-approve-as-agency, not
-        // admin-create-customer), redirect them to the right wizard.
         const accessRequestId = (user.user_metadata as Record<string, unknown> | undefined)
           ?.access_request_id as string | undefined
         if (accessRequestId) {
@@ -62,13 +85,30 @@ export function Onboarding() {
           throw new Error('Kein Invitation-Token gefunden. Bitte den Admin um eine neue Einladung.')
         }
 
-        // Skip password step if user authenticated via OAuth or already set one
+        // Re-fetch profile after linkInvitation may have populated customer_id.
+        const { data: profileAfter } = await supabase
+          .from('profiles')
+          .select('customer_id')
+          .eq('id', user.id)
+          .single()
+
+        let snapshot: CustomerSnapshot | null = null
+        if (profileAfter?.customer_id) {
+          const { data: c } = await supabase
+            .from('customers')
+            .select('id, has_payment_method, stripe_customer_id, stripe_account_id, customer_kind')
+            .eq('id', profileAfter.customer_id)
+            .single()
+          snapshot = (c as CustomerSnapshot | null) ?? null
+          setCustomer(snapshot)
+        }
+
         const isOAuth = user.app_metadata?.provider && user.app_metadata.provider !== 'email'
         const passwordAlreadySet = (user.user_metadata as Record<string, unknown> | undefined)
           ?.password_set === true
 
         if (isOAuth || passwordAlreadySet) {
-          finish()
+          continueAfterPassword(snapshot)
         } else {
           setPhase('password')
         }
@@ -134,7 +174,10 @@ export function Onboarding() {
         </motion.div>
       )}
 
-      {phase === 'password' && <PasswordSetupForm onDone={finish} />}
+      {phase === 'password' && (
+        <PasswordSetupForm onDone={() => continueAfterPassword(customer)} />
+      )}
+      {phase === 'payment' && <PaymentSetupForm onDone={finish} />}
     </AuthShell>
   )
 }
@@ -226,7 +269,7 @@ function PasswordSetupForm({ onDone }: { onDone: () => void }) {
         disabled={submitting || !password || !confirm}
         className="btn-primary w-full"
       >
-        {submitting ? 'Speichere…' : 'Konto fertigstellen'}
+        {submitting ? 'Speichere…' : 'Weiter'}
       </button>
     </form>
   )

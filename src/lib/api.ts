@@ -252,6 +252,7 @@ export type SetupIntentResult = {
   client_secret: string
   setup_intent_id: string
   publishable_key: string
+  stripe_account_id: string | null
 }
 
 export async function getSetupIntent(): Promise<SetupIntentResult> {
@@ -259,7 +260,18 @@ export async function getSetupIntent(): Promise<SetupIntentResult> {
     'setup-intent',
     { body: {} }
   )
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(await extractEdgeError(error))
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data
+}
+
+// ─── confirm-setup-intent (sync DB after Elements client-side confirm) ───
+export async function confirmSetupIntent(setupIntentId: string): Promise<{ ok: true }> {
+  const { data, error } = await supabase.functions.invoke<{ ok: true }>(
+    'confirm-setup-intent',
+    { body: { setup_intent_id: setupIntentId } }
+  )
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data
 }

@@ -46,19 +46,26 @@ Deno.serve(async (req) => {
 
     const { data: customer } = await supabaseAdmin
       .from('customers')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id, stripe_account_id')
       .eq('id', profile.customer_id)
       .maybeSingle()
 
     if (!customer?.stripe_customer_id) return json({ error: 'no_stripe_customer' }, 400)
 
-    // Create SetupIntent
+    // If the customer lives on a partner's connected Stripe account, route the
+    // SetupIntent there — otherwise the payment method would end up attached
+    // to a non-existent Customer object on the platform.
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    if (customer.stripe_account_id) {
+      headers['Stripe-Account'] = customer.stripe_account_id as string
+    }
+
     const stripeRes = await fetch('https://api.stripe.com/v1/setup_intents', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers,
       body: new URLSearchParams({
         customer: customer.stripe_customer_id,
         'payment_method_types[]': 'card',
@@ -76,7 +83,10 @@ Deno.serve(async (req) => {
       ok: true,
       client_secret: setupIntent.client_secret,
       setup_intent_id: setupIntent.id,
+      // Stripe Elements needs the publishable key. The platform's publishable
+      // works for connected accounts too via the `stripeAccount` Elements prop.
       publishable_key: Deno.env.get('STRIPE_PUBLISHABLE_KEY')!,
+      stripe_account_id: customer.stripe_account_id ?? null,
     })
   } catch (e) {
     return json({ error: 'unexpected', detail: String(e) }, 500)
