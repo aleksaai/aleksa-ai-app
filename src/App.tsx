@@ -25,6 +25,8 @@ import { AgencySettings } from './pages/agency/AgencySettings'
 import { AgencyOnboarding } from './pages/AgencyOnboarding'
 import { AgencyCustomerNew } from './pages/agency/AgencyCustomerNew'
 import { AgencyCustomerDetail } from './pages/agency/AgencyCustomerDetail'
+import { PlatformAdminAgencies } from './pages/PlatformAdminAgencies'
+import { PlatformAdminAgencyDetail } from './pages/PlatformAdminAgencyDetail'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -171,6 +173,24 @@ export default function App() {
           </RequireAuth>
         }
       />
+      {/* ============ PLATFORM-ADMIN ROUTES (Aleksa-only) ============ */}
+      <Route
+        path="/platform-admin/agencies"
+        element={
+          <RequireAuth>
+            <PlatformAdminAgencies />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/platform-admin/agencies/:id"
+        element={
+          <RequireAuth>
+            <PlatformAdminAgencyDetail />
+          </RequireAuth>
+        }
+      />
+
       {/* ============ AGENCY OWNER (PARTNER) ROUTES ============ */}
       <Route
         path="/agency-onboarding"
