@@ -89,9 +89,19 @@ Deno.serve(async (req) => {
 
     const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // Verify caller's profile + ensure they don't already have an agency
+    // Verify caller's profile + ensure they don't already have an agency.
+    // Critical: refuse if caller is currently `admin` (Aleksa's own role).
+    // The straight-line .update({role: 'agency_owner', agency_id: ...}) below
+    // would otherwise demote Aleksa to agency_owner and strip his platform-
+    // admin access — easy to trigger by mistake during a self-test.
     const { data: profile } = await sbAdmin
       .from('profiles').select('role, agency_id').eq('id', user.id).maybeSingle()
+    if (profile?.role === 'admin') {
+      return json({
+        error: 'admin_cannot_self_onboard',
+        detail: 'Du bist platform-admin. Nutze für End-to-End-Tests eine separate Test-Email (z.B. dein+test@aleksa.ai mit Plus-Notation), nicht deine Admin-Email — sonst würdest du deinen Admin-Status verlieren.',
+      }, 403)
+    }
     if (profile?.agency_id) {
       return json({ error: 'already_has_agency', agency_id: profile.agency_id }, 409)
     }
