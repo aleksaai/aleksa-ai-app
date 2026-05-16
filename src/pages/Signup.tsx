@@ -81,7 +81,7 @@ export function Signup() {
             <span className="heading-accent">Zugang</span> anfragen
           </h1>
           <p className="mt-1.5 text-sm text-ink-muted">
-            Die Plattform ist für Mitglieder der <strong className="text-ink-soft">OpenPeng Community</strong> reserviert.
+            Die Plattform ist für Mitglieder der <strong className="text-ink-soft">OpenPenguin Community</strong> reserviert.
             Sende deine Anfrage mit der Email, mit der du auch dort registriert bist —
             wir prüfen das manuell und schicken dir einen Einladungs-Link.
           </p>
@@ -104,7 +104,7 @@ export function Signup() {
 
         <div>
           <label htmlFor="email" className="label-soft mb-2 block">
-            Email <span className="text-ink-muted">(OpenPeng-Account)</span>
+            Email <span className="text-ink-muted">(OpenPenguin-Account)</span>
           </label>
           <input
             id="email"

@@ -70,7 +70,7 @@ export function Invite() {
           <div>
             <p className="eyebrow mb-1.5">Einladung</p>
             <h1 className="text-2xl font-semibold tracking-tight">
-              <span className="heading-accent">Willkommen</span> bei OpenPeng Voice
+              <span className="heading-accent">Willkommen</span> bei OpenPenguin Voice
             </h1>
             <p className="mt-2 text-sm text-ink-muted">
               Du wurdest als Kunde für <strong className="text-ink-soft">{info.customer_name}</strong> eingeladen.

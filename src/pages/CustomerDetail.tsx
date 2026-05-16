@@ -117,7 +117,7 @@ export function CustomerDetail() {
             Plattform-<span className="heading-accent">Mitglied</span>
           </h2>
           <p className="mt-2 text-sm text-ink-muted">
-            Dies ist ein OpenPeng-Community-Mitglied mit eigenem Account.
+            Dies ist ein OpenPenguin-Community-Mitglied mit eigenem Account.
             Du hast keinen Zugriff auf deren Daten — sie betreiben ihr eigenes Whitelabel-Setup.
           </p>
         </div>

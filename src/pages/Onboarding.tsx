@@ -1,7 +1,7 @@
 // Onboarding flow for new community members.
 //
 // Old flow (V1 for paying voice-agent customers): linking → password → Stripe SetupIntent → done.
-// New flow (OpenPeng Voice community perk): linking → password → done.
+// New flow (OpenPenguin Voice community perk): linking → password → done.
 //
 // Stripe is no longer collected here — community members don't pay Aleksa,
 // they bring their own Stripe + their own ElevenLabs/Retell keys (and

@@ -1,10 +1,10 @@
-# HANDOFF.md — OpenPeng Voice
+# HANDOFF.md — OpenPenguin Voice
 
 > Cross-session + cross-device onboarding. Read this when picking up work. Update at end of each session.
 
 ## Last update
 
-**2026-05-16** — Marcus (major rebrand to OpenPeng Voice + new domain + new auth/signup flow + interim platform_member separation)
+**2026-05-16** — Marcus (major rebrand to OpenPenguin Voice + new domain + new auth/signup flow + interim platform_member separation)
 
 ## Current state
 
@@ -12,7 +12,7 @@
 
 ### What was done this session (2026-05-16)
 
-- **Rebrand:** AleksaAI → **OpenPeng Voice** across UI, page title, email templates
+- **Rebrand:** AleksaAI → **OpenPenguin Voice** across UI, page title, email templates
 - **Domain:** `app.aleksa.ai` → **`platform.openpeng.de`** (Supabase Site URL + APP_URL secret updated)
 - **Login:** Magic-link-only → **Email + Passwort + Google OAuth + Passwort-Reset** (`/reset-password`)
 - **Signup-request flow:** Public `/signup` page → `access_requests` table → admin reviews on `/admin/requests` → approval triggers Magic-Link directly to `/onboarding` (one-click, no `/invite/:token` intermediate)
@@ -100,9 +100,9 @@ All under `https://puimwizupgkdvxpanlhy.supabase.co/functions/v1/<slug>`.
 
 ### New (this session)
 
-- **Product name:** **OpenPeng Voice** — sub-brand under the OpenPeng community (openpeng.de)
+- **Product name:** **OpenPenguin Voice** — sub-brand under the OpenPenguin community (openpeng.de)
 - **Primary domain:** `platform.openpeng.de` (subdomain of openpeng.de). Future product subdomains pattern: `voice.openpeng.de`, `chat.openpeng.de`, `mail.openpeng.de`
-- **Whitelabel target users:** members of Aleksa's KI-Schule / OpenPeng community (initially 10-20 people, community perk, not paid SaaS)
+- **Whitelabel target users:** members of Aleksa's KI-Schule / OpenPenguin community (initially 10-20 people, community perk, not paid SaaS)
 - **Whitelabel future subdomains:** members pick their own slug (e.g. `stephan.openpeng.de`, `kihelden.openpeng.de`). Custom domains (`app.kihelden.de`) come in a later phase via Netlify domain aliases (Free plan supports ~50, Pro $20/mo needed for wildcard or more)
 - **BYO Everything for agencies:** each whitelabel member brings their own Stripe (via Connect), ElevenLabs API key, Retell key, etc. They pay nothing to Aleksa
 - **Auth providers active:** email+password (primary), Google OAuth (additional, can be linked from `/account`), Magic-Link (used for invitation flow only)
@@ -143,7 +143,7 @@ The proper fix for the customer_kind interim hack. Specs partly drafted in this 
 
 - **webhook-retellai** — for Retell-AI integrations to actually populate the `calls` table (analytics + transcripts)
 - **Admin AgentDetail (`/admin/agents/:id`)** — still ElevenLabs-only labels. Customer-AgentDetail already platform-aware. Bring admin to parity
-- **Email-template polish** — currently approval email is functional but plain. Could match the OpenPeng Voice branding better
+- **Email-template polish** — currently approval email is functional but plain. Could match the OpenPenguin Voice branding better
 - **Retell Knowledge Base** — currently Wissensbasis tab hidden for Retell agents
 
 ## Open Aleksa items

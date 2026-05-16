@@ -40,16 +40,16 @@
 27. ✅ HANDOFF.md — current state
 28. ✅ ROADMAP.md — this file
 
-### V3 "OpenPeng Voice Rebrand + Community-Member Onboarding" (2026-05-16)
+### V3 "OpenPenguin Voice Rebrand + Community-Member Onboarding" (2026-05-16)
 
-29. ✅ Rebrand AleksaAI → **OpenPeng Voice** (UI, page title, email templates)
+29. ✅ Rebrand AleksaAI → **OpenPenguin Voice** (UI, page title, email templates)
 30. ✅ Domain migration `app.aleksa.ai` → `platform.openpeng.de` (Supabase Auth + Edge Function APP_URL)
 31. ✅ Login: Magic-Link-only → **Email+Password + Google OAuth + Forgot-Password** (`/reset-password`)
 32. ✅ Public access-request flow: `/signup` page → `access_requests` table → `/admin/requests` review → approval triggers one-click magic-link → `/onboarding`
 33. ✅ Onboarding password-step (replaces magic-link-only setup)
 34. ✅ `/account` page — link/unlink Google identity, change password
 35. ✅ `customers.customer_kind` separation (`voice_customer` | `platform_member`) — community members hidden from admin overview, no Stripe customer created
-36. ✅ Cartoon-penguin logo + favicon (OpenPeng Voice brand mark)
+36. ✅ Cartoon-penguin logo + favicon (OpenPenguin Voice brand mark)
 37. ✅ One-click magic-link in approval email (admin-create-customer now uses `supabase.auth.admin.generateLink({type:'invite'})` with direct redirect to `/onboarding?invitation_token=...`)
 38. ✅ Onboarding drops Stripe SetupIntent step for community members (they don't pay)
 
@@ -99,7 +99,7 @@ The proper architectural fix for the current `customer_kind=platform_member` wor
 - **webhook-retellai** Edge Function — Retell's post-call signature scheme, mirrors webhook-elevenlabs. Without this, Retell-agents have no calls in the `calls` table → analytics blank for Retell users
 - **Admin `/admin/agents/:id` Retell support** — Customer-AgentDetail is already platform-aware; admin AgentDetail still ElevenLabs-only labels
 - **Retell Knowledge Base** — currently Wissensbasis tab hidden for Retell. Retell has its own KB-API; implement parallel branch
-- **Email template polish** — Resend invite-email currently functional but plain. Add OpenPeng Voice logo + better layout
+- **Email template polish** — Resend invite-email currently functional but plain. Add OpenPenguin Voice logo + better layout
 - **Clean up legacy app.aleksa.ai domain** — decide: re-add as Netlify alias for backward compat, OR retire and let DNS expire
 - **Cleanup of community members already created as voice_customer** — if Aleksa approved any community signups before 2026-05-16, they're still in `/admin` customer list. SQL: `UPDATE customers SET customer_kind='platform_member' WHERE contact_email IN (SELECT email FROM access_requests WHERE status='approved')`
 

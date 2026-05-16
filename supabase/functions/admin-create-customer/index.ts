@@ -166,14 +166,14 @@ Deno.serve(async (req) => {
     try {
       const resend = new Resend(RESEND_API_KEY)
       const r = await resend.emails.send({
-        from: 'OpenPeng Voice <noreply@projekt.aleksa.ai>',
+        from: 'OpenPenguin Voice <noreply@projekt.aleksa.ai>',
         to: contactEmail,
-        subject: `Willkommen bei OpenPeng Voice — ${name}`,
+        subject: `Willkommen bei OpenPenguin Voice — ${name}`,
         html: `
           <div style="font-family: Inter, -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
             <h1 style="font-size: 24px; margin: 0 0 16px;">Hallo,</h1>
             <p style="font-size: 16px; line-height: 1.5; color: #475569;">
-              du wurdest zu <strong>OpenPeng Voice</strong> freigeschaltet — der Plattform für deine Voice-Agent-Verwaltung.
+              du wurdest zu <strong>OpenPenguin Voice</strong> freigeschaltet — der Plattform für deine Voice-Agent-Verwaltung.
             </p>
             <p style="margin: 24px 0;">
               <a href="${magicLink}" style="display: inline-block; background: #65A4FF; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">

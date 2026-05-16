@@ -1,15 +1,15 @@
-# OpenPeng Voice — Claude Code Project Context
+# OpenPenguin Voice — Claude Code Project Context
 
 > Auto-loaded by every Claude Code session in this directory. Single source of truth for "what is this?" and "how do I work on it?". Keep up to date.
 
-> **Renamed 2026-05-16** from "AleksaAI App" → **OpenPeng Voice**. The GitHub repo + Supabase project keep their old slugs (`aleksa-ai-app` / `puimwizupgkdvxpanlhy`) — only the user-facing branding + domain changed.
+> **Renamed 2026-05-16** from "AleksaAI App" → **OpenPenguin Voice**. The GitHub repo + Supabase project keep their old slugs (`aleksa-ai-app` / `puimwizupgkdvxpanlhy`) — only the user-facing branding + domain changed.
 
 ## What this is
 
-**OpenPeng Voice** — voice-agent management platform under the OpenPeng community brand (openpeng.de). Two parallel uses:
+**OpenPenguin Voice** — voice-agent management platform under the OpenPenguin community brand (openpeng.de). Two parallel uses:
 
 1. **Aleksa's own voice-agent reselling** (legacy V1) — onboards paying voice-customers (VV-Cars, Fresh-Puls, etc.), assigns them ElevenLabs/Retell voice-agents, daily-cron pushes call-minutes to Stripe → automated billing
-2. **Community whitelabel perk (new, 2026-05-16+)** — members of Aleksa's KI-Schule / OpenPeng community sign up via `/signup` → Aleksa approves → magic-link → they get a (currently shared) instance to manage their own voice-agents. **No Stripe needed for them** — they bring their own everything. Multi-tenant proper Agency tier is Phase 2 (not yet built)
+2. **Community whitelabel perk (new, 2026-05-16+)** — members of Aleksa's KI-Schule / OpenPenguin community sign up via `/signup` → Aleksa approves → magic-link → they get a (currently shared) instance to manage their own voice-agents. **No Stripe needed for them** — they bring their own everything. Multi-tenant proper Agency tier is Phase 2 (not yet built)
 
 The two use-cases coexist via the **`customers.customer_kind`** column (`voice_customer` for #1, `platform_member` for #2). See `HANDOFF.md` for the full migration plan.
 
@@ -101,7 +101,7 @@ For detailed flow diagrams + DB schema + every Edge Function signature, see [`AR
 
 The `customers.customer_kind` column splits clients into two groups:
 - **`voice_customer`** (default) — Aleksa's paying voice-agent clients (VV-Cars, Fresh-Puls). Stripe customer attached, get billed via daily cron
-- **`platform_member`** — OpenPeng community members who got whitelabel access via the `/signup` → admin-approval flow. NO Stripe customer, NOT shown in `/admin` customer list, admin cannot access their data via UI
+- **`platform_member`** — OpenPenguin community members who got whitelabel access via the `/signup` → admin-approval flow. NO Stripe customer, NOT shown in `/admin` customer list, admin cannot access their data via UI
 
 When approving an access_request, the row is created with `kind='platform_member'` automatically.
 

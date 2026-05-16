@@ -62,7 +62,7 @@ Used inside other tables' RLS to avoid recursive-RLS-on-profiles bugs.
 
 **customer_kind interim model (since 2026-05-16):**
 - `voice_customer` (legacy default) — paying voice-agent clients with Stripe customer + subscriptions
-- `platform_member` — OpenPeng community members. No Stripe customer (skipped in admin-create-customer). Hidden from `/admin` overview (frontend filters). `CustomerDetail.tsx` blocks UI access with "Plattform-Mitglied — kein Zugriff"
+- `platform_member` — OpenPenguin community members. No Stripe customer (skipped in admin-create-customer). Hidden from `/admin` overview (frontend filters). `CustomerDetail.tsx` blocks UI access with "Plattform-Mitglied — kein Zugriff"
 - Future: full Multi-Tenant Phase 1 migrates `platform_member` rows into a dedicated `agencies` table — see ROADMAP.md
 
 ### `access_requests` (since 2026-05-16)
@@ -72,7 +72,7 @@ Public signup-request storage. Anonymous visitors INSERT, admins SELECT and appr
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | gen_random_uuid() |
-| `email` | text not null | OpenPeng community email |
+| `email` | text not null | OpenPenguin community email |
 | `name` | text not null | Full name |
 | `message` | text nullable | Optional pitch |
 | `status` | text not null default `'pending'` | `pending` / `approved` / `rejected`. CHECK constraint |

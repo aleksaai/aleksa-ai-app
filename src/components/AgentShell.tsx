@@ -54,7 +54,7 @@ export function AgentShell({
         <Link to={adminPreview ? '#' : '/dashboard'} className="flex items-center gap-2">
           <Logo />
           <span className="truncate text-base font-semibold tracking-tight">
-            {customerName ?? 'OpenPeng Voice'}
+            {customerName ?? 'OpenPenguin Voice'}
           </span>
         </Link>
         <button
@@ -84,7 +84,7 @@ export function AgentShell({
               <Logo />
               <div className="flex min-w-0 flex-col leading-none">
                 <span className="truncate text-base font-semibold tracking-tight text-ink">
-                  {customerName ?? 'OpenPeng Voice'}
+                  {customerName ?? 'OpenPenguin Voice'}
                 </span>
                 {adminPreview && (
                   <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-amber-700">
@@ -164,7 +164,7 @@ export function AgentShell({
                   >
                     <Logo />
                     <span className="truncate text-base font-semibold tracking-tight">
-                      {customerName ?? 'OpenPeng Voice'}
+                      {customerName ?? 'OpenPenguin Voice'}
                     </span>
                   </Link>
                 </div>
@@ -249,7 +249,7 @@ export function AgentShell({
 
 function Logo() {
   return (
-    <img src="/logo-color.png" alt="OpenPeng Voice" className="h-11 w-11 shrink-0 object-contain" />
+    <img src="/logo-color.png" alt="OpenPenguin Voice" className="h-11 w-11 shrink-0 object-contain" />
   )
 }
 
