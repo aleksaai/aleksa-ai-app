@@ -32,7 +32,7 @@ export function AgencyCustomerNew() {
     <AgencyShell
       pageEyebrow="Neuer Kunde"
       pageTitle={<>Kunde <span className="heading-accent">anlegen</span></>}
-      backTo="/agency/customers"
+      backTo="/agency"
       backLabel="Zur Kundenliste"
     >
       {result ? (

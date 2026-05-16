@@ -310,7 +310,19 @@ export async function adminCreatePricingPlan(
     'admin-create-pricing-plan',
     { body: input }
   )
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(await extractEdgeError(error))
+  if (!data || !('ok' in data)) throw new Error('Invalid response')
+  return data
+}
+
+export async function agencyCreatePricingPlan(
+  input: PricingPlanInput
+): Promise<CreatePricingPlanResult> {
+  const { data, error } = await supabase.functions.invoke<CreatePricingPlanResult>(
+    'agency-create-pricing-plan',
+    { body: input }
+  )
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data
 }

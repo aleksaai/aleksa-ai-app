@@ -19,13 +19,13 @@ import { Signup } from './pages/Signup'
 import { Requests } from './pages/Requests'
 import { Account } from './pages/Account'
 import { AgencyHome } from './pages/agency/AgencyHome'
-import { AgencyCustomers } from './pages/agency/AgencyCustomers'
 import { AgencyAgents } from './pages/agency/AgencyAgents'
 import { AgencySettings } from './pages/agency/AgencySettings'
 import { AgencyOnboarding } from './pages/AgencyOnboarding'
 import { AgencyCustomerNew } from './pages/agency/AgencyCustomerNew'
 import { AgencyCustomerDetail } from './pages/agency/AgencyCustomerDetail'
 import { AgencyIntegrations } from './pages/agency/AgencyIntegrations'
+import { AgencyPricing } from './pages/agency/AgencyPricing'
 import { PlatformAdminAgencies } from './pages/PlatformAdminAgencies'
 import { PlatformAdminAgencyDetail } from './pages/PlatformAdminAgencyDetail'
 import { StripeConnectCallback } from './pages/StripeConnectCallback'
@@ -201,14 +201,9 @@ export default function App() {
           </RequireAuth>
         }
       />
-      <Route
-        path="/agency/customers"
-        element={
-          <RequireAuth requireRole="agency_owner">
-            <AgencyCustomers />
-          </RequireAuth>
-        }
-      />
+      {/* /agency/customers used to be its own list — now the customer list lives
+          on /agency (the overview). Redirect for any leftover links. */}
+      <Route path="/agency/customers" element={<Navigate to="/agency" replace />} />
       <Route
         path="/agency/customers/new"
         element={
@@ -238,6 +233,14 @@ export default function App() {
         element={
           <RequireAuth requireRole="agency_owner">
             <AgencyIntegrations />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/pricing"
+        element={
+          <RequireAuth requireRole="agency_owner">
+            <AgencyPricing />
           </RequireAuth>
         }
       />

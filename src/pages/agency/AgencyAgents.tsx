@@ -67,7 +67,7 @@ export function AgencyAgents() {
           <p className="mt-2 text-sm text-ink-muted">
             Lege erst einen Kunden an, dann kannst du diesem einen Voice-Agent zuweisen.
           </p>
-          <Link to="/agency/customers" className="btn-primary mt-5 inline-flex">
+          <Link to="/agency" className="btn-primary mt-5 inline-flex">
             Zu den Kunden
           </Link>
         </div>

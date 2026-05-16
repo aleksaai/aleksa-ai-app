@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { adminCreatePricingPlan, type PricingPlanInput } from '../lib/api'
+import { adminCreatePricingPlan, agencyCreatePricingPlan, type PricingPlanInput } from '../lib/api'
 
 type Props = {
   open: boolean
   onClose: () => void
   onCreated: () => void
+  // 'admin' (default) uses the platform Stripe account; 'agency' routes
+  // through the partner's connected account.
+  scope?: 'admin' | 'agency'
 }
 
 type Mode = 'hybrid' | 'per_minute' | 'one_time'
@@ -22,7 +25,7 @@ const MODE_DESCRIPTIONS: Record<Mode, string> = {
   one_time: 'Einmal-Charge — kein Abo',
 }
 
-export function NewPricingPlanDialog({ open, onClose, onCreated }: Props) {
+export function NewPricingPlanDialog({ open, onClose, onCreated, scope = 'admin' }: Props) {
   const [mode, setMode] = useState<Mode>('hybrid')
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('EUR')
@@ -94,7 +97,11 @@ export function NewPricingPlanDialog({ open, onClose, onCreated }: Props) {
         }
       }
 
-      await adminCreatePricingPlan(input)
+      if (scope === 'agency') {
+        await agencyCreatePricingPlan(input)
+      } else {
+        await adminCreatePricingPlan(input)
+      }
       setStatus('success')
       onCreated()
       setTimeout(handleClose, 800)

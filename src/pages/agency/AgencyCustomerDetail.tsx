@@ -51,7 +51,7 @@ export function AgencyCustomerDetail() {
 
   if (loading) {
     return (
-      <AgencyShell pageEyebrow="Kunde" pageTitle="Lade…" backTo="/agency/customers" backLabel="Zur Kundenliste">
+      <AgencyShell pageEyebrow="Kunde" pageTitle="Lade…" backTo="/agency" backLabel="Zur Kundenliste">
         <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade Kunden-Daten…</div>
       </AgencyShell>
     )
@@ -59,7 +59,7 @@ export function AgencyCustomerDetail() {
 
   if (!customer) {
     return (
-      <AgencyShell pageEyebrow="Kunde" pageTitle="Nicht gefunden" backTo="/agency/customers" backLabel="Zur Kundenliste">
+      <AgencyShell pageEyebrow="Kunde" pageTitle="Nicht gefunden" backTo="/agency" backLabel="Zur Kundenliste">
         <div className="rounded-xl border border-red-200 bg-red-50/80 p-4 text-sm text-red-700">
           Kunde nicht gefunden — vielleicht gehört er nicht zu deiner Agency.
         </div>
@@ -71,7 +71,7 @@ export function AgencyCustomerDetail() {
     <AgencyShell
       pageEyebrow="Kunde"
       pageTitle={<>{customer.name}</>}
-      backTo="/agency/customers"
+      backTo="/agency"
       backLabel="Zur Kundenliste"
     >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

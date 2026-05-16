@@ -1,118 +1,224 @@
-// /agency — Partner dashboard overview.
-// Shows top-level stats for the agency's portfolio of customers + voice agents.
-// Stats are loaded directly from the DB via the RLS-scoped supabase client
-// (agency_owner sees only their own agency's rows).
+// /agency — Partner overview = customer list (mirrors the master /admin pattern).
+// Search bar + customer cards + "Neuer Kunde" button. No onboarding boxes once
+// the partner is set up — branding, Stripe connect and customer creation each
+// live on their own pages.
 
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { motion } from 'motion/react'
 import { AgencyShell } from '../../components/AgencyShell'
 import { useAuth } from '../../lib/auth'
-import { useTenant } from '../../lib/tenant'
 import { supabase } from '../../lib/supabase'
-
-type Stats = {
-  customers: number
-  voice_agents: number
-  calls_30d: number
-  call_minutes_30d: number
-}
+import type { Customer } from '../../types/db'
 
 export function AgencyHome() {
   const { profile } = useAuth()
-  const { agency } = useTenant()
-  const [stats, setStats] = useState<Stats | null>(null)
+  const navigate = useNavigate()
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     if (!profile?.agency_id) return
     const load = async () => {
       setLoading(true)
-      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-
-      const [customers, voiceAgents, calls] = await Promise.all([
-        supabase.from('customers').select('id', { count: 'exact', head: true }),
-        supabase.from('voice_agents').select('id', { count: 'exact', head: true }),
-        supabase
-          .from('calls')
-          .select('duration_secs')
-          .gte('started_at', cutoff),
-      ])
-
-      const callRows = (calls.data ?? []) as { duration_secs: number }[]
-      const totalSecs = callRows.reduce((acc, c) => acc + (c.duration_secs ?? 0), 0)
-
-      setStats({
-        customers: customers.count ?? 0,
-        voice_agents: voiceAgents.count ?? 0,
-        calls_30d: callRows.length,
-        call_minutes_30d: Math.round(totalSecs / 60),
-      })
+      const { data } = await supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false })
+      setCustomers((data ?? []) as Customer[])
       setLoading(false)
     }
     void load()
   }, [profile?.agency_id])
 
+  const filtered = useMemo(() => {
+    if (!search.trim()) return customers
+    const q = search.toLowerCase().trim()
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) || c.contact_email.toLowerCase().includes(q),
+    )
+  }, [customers, search])
+
   return (
-    <AgencyShell pageEyebrow="Übersicht" pageTitle={<>Willkommen <span className="heading-accent">zurück</span></>}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Kunden" value={loading ? '–' : String(stats?.customers ?? 0)} cta={{ to: '/agency/customers', label: 'verwalten →' }} />
-        <StatCard label="Voice-Agents" value={loading ? '–' : String(stats?.voice_agents ?? 0)} cta={{ to: '/agency/agents', label: 'verwalten →' }} />
-        <StatCard label="Anrufe (30 Tage)" value={loading ? '–' : String(stats?.calls_30d ?? 0)} />
-        <StatCard label="Minuten (30 Tage)" value={loading ? '–' : String(stats?.call_minutes_30d ?? 0)} />
+    <AgencyShell
+      pageEyebrow="Übersicht"
+      pageTitle={<>Deine <span className="heading-accent">Kunden</span></>}
+      pageAction={
+        <Link to="/agency/customers/new" className="btn-primary">
+          <PlusIcon /> Neuer Kunde
+        </Link>
+      }
+    >
+      <div className="mb-6">
+        <SearchBar value={search} onChange={setSearch} count={filtered.length} total={customers.length} />
       </div>
 
-      {agency && (
-        <div className="mt-8 glass-card p-6">
-          <p className="eyebrow mb-2">Dein Whitelabel</p>
-          <p className="text-sm text-ink-soft">
-            Deine Plattform läuft unter{' '}
-            <code className="rounded bg-white/60 px-2 py-0.5 text-xs">https://{agency.slug}.openpenguin.de</code>
-            {' '}— teile diesen Link mit deinen Kunden.
-          </p>
-          <div className="mt-3 flex gap-2 text-xs">
-            <Link to="/agency/settings" className="btn-subtle">Whitelabel anpassen</Link>
-          </div>
+      {loading ? (
+        <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade…</div>
+      ) : customers.length === 0 ? (
+        <EmptyState />
+      ) : filtered.length === 0 ? (
+        <div className="glass-card p-10 text-center text-sm text-ink-muted">
+          Keine Kunden gefunden für "<strong className="text-ink">{search}</strong>".
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((c, i) => (
+            <motion.button
+              key={c.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              whileHover={{ y: -2 }}
+              onClick={() => navigate(`/agency/customers/${c.id}`)}
+              className="group relative overflow-hidden rounded-2xl glass p-5 text-left transition-all hover:shadow-glass-lg"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar name={c.name} />
+                  <div>
+                    <p className="font-semibold tracking-tight text-ink">{c.name}</p>
+                    <p className="mt-0.5 text-xs text-ink-muted">{c.contact_email}</p>
+                  </div>
+                </div>
+                <StatusPill ok={c.has_payment_method} />
+              </div>
+
+              <div className="mt-5 flex items-center justify-between border-t border-white/40 pt-3 text-xs text-ink-muted">
+                <span>
+                  Seit{' '}
+                  {new Date(c.created_at).toLocaleDateString('de-DE', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </span>
+                <span
+                  className="font-medium opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{ color: 'var(--accent-700)' }}
+                >
+                  Öffnen →
+                </span>
+              </div>
+            </motion.button>
+          ))}
         </div>
       )}
-
-      <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ActionCard
-          title="Neuen Kunden anlegen"
-          description="Onboarde einen Endkunden mit eigenem Account."
-          to="/agency/customers"
-        />
-        <ActionCard
-          title="Stripe verbinden"
-          description="Verknüpfe deinen Stripe-Account um Kunden direkt abzurechnen."
-          to="/agency/settings"
-        />
-      </div>
     </AgencyShell>
   )
 }
 
-function StatCard({ label, value, cta }: { label: string; value: string; cta?: { to: string; label: string } }) {
+function SearchBar({
+  value,
+  onChange,
+  count,
+  total,
+}: {
+  value: string
+  onChange: (v: string) => void
+  count: number
+  total: number
+}) {
   return (
-    <div className="glass-card p-5">
-      <p className="label-soft mb-2">{label}</p>
-      <p className="text-3xl font-semibold tracking-tight text-ink">{value}</p>
-      {cta && (
-        <Link to={cta.to} className="mt-3 inline-block text-xs font-medium" style={{ color: 'var(--accent-700)' }}>
-          {cta.label}
-        </Link>
-      )}
+    <div className="relative">
+      <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-ink-muted">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      </div>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Kunden suchen…"
+        className="glass-input w-full pl-12 pr-32"
+        style={{ paddingTop: '0.75rem', paddingBottom: '0.75rem' }}
+      />
+      <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-xs text-ink-muted">
+        {value.trim() ? (
+          <span>{count} von {total}</span>
+        ) : (
+          <span>{total} {total === 1 ? 'Kunde' : 'Kunden'}</span>
+        )}
+      </div>
     </div>
   )
 }
 
-function ActionCard({ title, description, to }: { title: string; description: string; to: string }) {
+function StatusPill({ ok }: { ok: boolean }) {
+  return ok ? (
+    <span className="pill-success">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      Aktiv
+    </span>
+  ) : (
+    <span className="pill-warn">
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+      Onboarding
+    </span>
+  )
+}
+
+function Avatar({ name }: { name: string }) {
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
   return (
-    <Link to={to} className="glass-card group block p-5 transition-shadow hover:shadow-lg">
-      <h3 className="text-base font-semibold tracking-tight text-ink">{title}</h3>
-      <p className="mt-1 text-sm text-ink-muted">{description}</p>
-      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--accent-700)' }}>
-        Weiter →
-      </span>
-    </Link>
+    <div
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white"
+      style={{
+        background:
+          'linear-gradient(135deg, var(--accent-400) 0%, var(--accent-500) 50%, var(--accent-600) 100%)',
+        boxShadow:
+          '0 1px 0 0 rgba(255,255,255,0.4) inset, 0 4px 14px -4px rgba(var(--accent-shadow-rgb),0.45)',
+      }}
+    >
+      {initials}
+    </div>
+  )
+}
+
+function EmptyState() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="glass-card-lg p-12 text-center"
+    >
+      <div
+        className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
+        style={{
+          background:
+            'linear-gradient(135deg, rgba(var(--accent-400-rgb), 0.2) 0%, rgba(var(--accent-400-rgb), 0.4) 100%)',
+        }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-700)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold tracking-tight">
+        Noch <span className="heading-accent">keine Kunden</span>
+      </h3>
+      <p className="mx-auto mt-1.5 max-w-md text-sm text-ink-muted">
+        Leg deinen ersten Kunden an. Sie bekommen einen eigenen Account mit dir als Anbieter.
+      </p>
+      <Link to="/agency/customers/new" className="btn-primary mt-5 inline-flex">
+        Ersten Kunden anlegen
+      </Link>
+    </motion.div>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
   )
 }
