@@ -4,6 +4,26 @@
 
 import { supabase } from './supabase'
 
+// supabase.functions.invoke wraps non-2xx responses behind a generic
+// "Edge Function returned a non-2xx status code" message, with the actual
+// JSON error body hidden on error.context (a Response). This helper
+// extracts the real error string from there. Older wrappers in this file
+// did a try/throw/catch{} dance that silently dropped the parsed body
+// back to the generic message — use this instead.
+async function extractEdgeError(error: any): Promise<string> {
+  try {
+    const ctx = error?.context
+    if (ctx?.json) {
+      const body = await ctx.json()
+      const errStr = body?.error ?? ''
+      const detailStr = body?.detail ? `: ${body.detail}` : ''
+      const combined = `${errStr}${detailStr}`.trim()
+      if (combined) return combined
+    }
+  } catch { /* response wasn't json, fall through to generic */ }
+  return error?.message ?? 'Unbekannter Fehler'
+}
+
 // ─── admin-approve-as-agency (Multi-Tenant Phase I) ────────────
 
 export async function adminApproveAsAgency(access_request_id: string): Promise<{
@@ -16,16 +36,7 @@ export async function adminApproveAsAgency(access_request_id: string): Promise<{
   const { data, error } = await supabase.functions.invoke('admin-approve-as-agency', {
     body: { access_request_id },
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Unexpected response')
   return data as any
 }
@@ -36,16 +47,7 @@ export type AgencyCreateIntegrationInput = CreateIntegrationInput
 
 export async function agencyCreateIntegration(input: AgencyCreateIntegrationInput) {
   const { data, error } = await supabase.functions.invoke('agency-create-integration', { body: input })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Invalid response')
   return data as { ok: true; integration: { id: string; name: string; platform: string; region: string | null } }
 }
@@ -54,16 +56,7 @@ export async function agencyCreateIntegration(input: AgencyCreateIntegrationInpu
 
 export async function agencyListPlatformAgents(integration_id: string) {
   const { data, error } = await supabase.functions.invoke('agency-list-platform-agents', { body: { integration_id } })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Invalid response')
   return data as { ok: true; agents: ListedPlatformAgent[]; integration: { id: string; name: string; platform: string; region: string | null } }
 }
@@ -72,16 +65,7 @@ export async function agencyListPlatformAgents(integration_id: string) {
 
 export async function agencyCreateVoiceAgent(input: CreateVoiceAgentInput) {
   const { data, error } = await supabase.functions.invoke('agency-create-voice-agent', { body: input })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Invalid response')
   return data as { ok: true; agent: { id: string } }
 }
@@ -96,16 +80,7 @@ export async function stripeConnectStart(origin?: string): Promise<{
   const { data, error } = await supabase.functions.invoke('stripe-connect-start', {
     body: { origin: origin ?? window.location.origin },
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Unexpected response')
   return data as any
 }
@@ -116,16 +91,7 @@ export async function stripeConnectCallback(input: { code: string; state: string
   origin: string | null
 }> {
   const { data, error } = await supabase.functions.invoke('stripe-connect-callback', { body: input })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Unexpected response')
   return data as any
 }
@@ -136,16 +102,7 @@ export async function stripeConnectDisconnect(): Promise<{
   message?: string
 }> {
   const { data, error } = await supabase.functions.invoke('stripe-connect-disconnect', { body: {} })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Unexpected response')
   return data as any
 }
@@ -194,16 +151,7 @@ export async function agencyCreateCustomer(input: AgencyCreateCustomerInput): Pr
   const { data, error } = await supabase.functions.invoke('agency-create-customer', {
     body: input,
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Unexpected response')
   return data as any
 }
@@ -224,16 +172,7 @@ export async function agencyFinalizeOnboarding(input: AgencyFinalizeInput): Prom
   const { data, error } = await supabase.functions.invoke('agency-finalize-onboarding', {
     body: input,
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Unexpected response')
   return data as any
 }
@@ -494,16 +433,7 @@ export async function adminGetAgentConfig(voice_agent_id: string): Promise<Agent
   const { data, error } = await supabase.functions.invoke<AgentConfig>('admin-get-agent-config', {
     body: { voice_agent_id },
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data
 }
@@ -523,16 +453,7 @@ export type UpdateAgentConfigInput = {
 
 export async function adminUpdateAgentConfig(input: UpdateAgentConfigInput) {
   const { data, error } = await supabase.functions.invoke('admin-update-agent-config', { body: input })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Invalid response')
   return data
 }
@@ -563,16 +484,7 @@ export async function adminGetVoiceById(integration_id: string, voice_id: string
   const { data, error } = await supabase.functions.invoke<{ ok: true; voice: Voice }>('admin-get-voice', {
     body: { integration_id, voice_id },
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data.voice
 }
@@ -599,16 +511,7 @@ export async function adminCreateKbDoc(input: { integration_id: string; name: st
   const { data, error } = await supabase.functions.invoke<{ ok: true; doc: KBDoc }>('admin-create-kb-doc', {
     body: input,
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data.doc
 }
@@ -645,16 +548,7 @@ export async function adminGetCallDetail(call_id: string): Promise<CallDetail> {
   const { data, error } = await supabase.functions.invoke<CallDetail>('admin-get-call-detail', {
     body: { call_id },
   })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !('ok' in data)) throw new Error('Invalid response')
   return data
 }
@@ -692,16 +586,7 @@ export async function adminUpdateAgentKb(input: {
   rag_enabled?: boolean
 }) {
   const { data, error } = await supabase.functions.invoke('admin-update-agent-kb', { body: input })
-  if (error) {
-    try {
-      const ctx = (error as any).context
-      if (ctx?.json) {
-        const body = await ctx.json()
-        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
-      }
-    } catch {}
-    throw new Error(error.message)
-  }
+  if (error) throw new Error(await extractEdgeError(error))
   if (!data || !(data as any).ok) throw new Error('Invalid response')
   return data
 }
