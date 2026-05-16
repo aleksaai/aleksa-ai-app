@@ -40,6 +40,21 @@
 27. ✅ HANDOFF.md — current state
 28. ✅ ROADMAP.md — this file
 
+### V4 "Multi-Tenant Agency Tier (Phase 1 full)" (2026-05-16)
+
+Partners-Onboarding ist End-to-End live. Aleksa kann jetzt Community-Member als richtige Whitelabel-Partner approven; sie kriegen einen eigenen Account, eigene Subdomain ({slug}.openpenguin.de), optional eigene Custom-Domain, eigenes Branding, eigene Stripe-Verbindung, eigene Voice-Agents pro Kunde.
+
+39. ✅ DB: `agencies` table + `agency_id` columns on customers/profiles/pricing_plans/integrations/customer_invitations; `agency_owner` role in user_role enum; helper `current_user_agency_id()`; full RLS rewrite for agency-scoped tables
+40. ✅ Frontend tenant-detection (`useTenant`): hostname-based agency lookup via public `get_agency_branding` RPC + dynamic CSS-var palette injection from `brand_color`
+41. ✅ Agency-owner dashboard: `/agency` (stats), `/agency/customers`, `/agency/agents`, `/agency/integrations`, `/agency/settings`
+42. ✅ Onboarding wizard `/agency-onboarding`: slug picker (live availability check) → display name + brand color → finalize. `admin-approve-as-agency` + `agency-finalize-onboarding` Edge Functions.
+43. ✅ Partner customer creation (`/agency/customers/new` + `agency-create-customer` Edge Function with `max_customers` enforcement + partner-branded Resend email)
+44. ✅ Whitelabel editor in `/agency/settings`: editable display_name, brand_color (color-picker + hex), logo upload via Supabase Storage `agency-branding` bucket
+45. ✅ Custom domain verification flow: partner enters domain → CNAME instruction → `verify-custom-domain` Edge Function does DNS lookup via Cloudflare DoH + (optional) Netlify-alias-add via Netlify API
+46. ✅ Stripe Connect Standard flow: `stripe-connect-start` (Vault-backed CLIENT_ID), `stripe-connect-callback` (state-verified token exchange), `stripe-connect-disconnect`; PaymentsTab with Connect/Disconnect; bounce page at `/agency/settings/stripe-callback`
+47. ✅ Partner voice-agent CRUD: `/agency/integrations` page (own ElevenLabs/Retell keys via `agency-create-integration`), inline AssignVoiceAgentForm in customer detail (`agency-list-platform-agents` + `agency-create-voice-agent`)
+48. ✅ Platform-admin override UI: `/platform-admin/agencies` list + detail with suspend/reactivate, force-disconnect Stripe, manual custom-domain verify
+
 ### V3 "OpenPenguin Voice Rebrand + Community-Member Onboarding" (2026-05-16)
 
 29. ✅ Rebrand AleksaAI → **OpenPenguin Voice** (UI, page title, email templates)
@@ -57,7 +72,15 @@
 
 ## 🔜 Next Up (priorities for upcoming sessions)
 
-### Multi-Tenant Agency Tier — Phase 1 (~1 week, the big one)
+### Multi-Tenant Phase 1c (smaller follow-ups, post Phase 1b)
+
+- **Per-connected-account billing logic** — webhook-stripe extension to route Connected-Account events (event.account = acct_…) to the correct agency; partner-side subscription creation on their Stripe; pricing_plans-per-agency
+- **Per-agency email templates** — Resend domain per agency (each partner verifies their own sender), partner-branded Welcome/Magic-Link emails
+- **Per-agency analytics** — call cost margin tracking with partner-currency conversion, drill-down by agency
+- **Partner-side voice-agent editing** — Prompt/Voice/KB tabs in `/agency/agents/:id` (currently Aleksa-handled via existing `/admin/agents/:id`)
+- **Agency Pricing-Plans UI** — partner creates own plans + assigns them to customer voice-agents
+
+### Multi-Tenant Agency Tier — Phase 1 (~1 week, the big one) [SUPERSEDED — see V4 above]
 
 The proper architectural fix for the current `customer_kind=platform_member` workaround.
 

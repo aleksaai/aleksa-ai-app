@@ -4,7 +4,92 @@
 
 ## Last update
 
-**2026-05-16** — Marcus (Multi-Tenant Phase 1 partial ship: agencies table + RLS, tenant detection + branding, onboarding wizard, partner customer mgmt, whitelabel editor, custom domain verification. Stripe Connect + platform-admin override deferred to Phase 1b.)
+**2026-05-16** — Marcus (Multi-Tenant Phase 1b shipped: Stripe Connect Standard flow, Platform-admin override UI, Partner-side voice-agent CRUD with own integrations. Phase 1 build is now feature-complete; only Vault-secret prereqs + Aleksa-side DNS-wildcard remain before partners can be live-onboarded.)
+
+## Multi-Tenant Phase 1b — what landed (2026-05-16, V5)
+
+Built on top of Phase 1a's foundation (agencies table, tenant detection, onboarding wizard, whitelabel editor, custom-domain verification).
+
+### Phase J — Platform-admin override UI
+
+`/platform-admin/agencies` lists every agency Aleksa has approved, with per-row customer-count + voice-agent-count + 30-day call-count. Click-through to `/platform-admin/agencies/:id` shows full agency record + customer list + action buttons:
+
+- **Suspendieren** / **Reaktivieren** — flips `agencies.status`. When suspended, `get_agency_branding` RPC returns null so the subdomain stops resolving with branding (login still works on `platform.openpenguin.de`).
+- **Stripe trennen** — clears `stripe_connect_account_id` + `stripe_connect_status='disconnected'` (note: doesn't call Stripe's revoke endpoint — that happens from the partner side via `stripe-connect-disconnect` Edge Function).
+- **Custom-Domain manuell verifizieren** — flips status to `'verified'` when DNS hasn't propagated yet but Aleksa knows the partner has set the CNAME.
+
+No new Edge Functions needed; admin RLS bypass covers everything.
+
+### Phase G — Stripe Connect Standard flow
+
+Three new Edge Functions:
+- **`stripe-connect-start`** — reads `STRIPE_CONNECT_CLIENT_ID` from Postgres Vault, builds Stripe OAuth URL with `state = base64({aid, origin, n})`, returns to frontend.
+- **`stripe-connect-callback`** — exchanges OAuth code → `stripe_user_id`, verifies state matches caller's agency_id, persists on agency.
+- **`stripe-connect-disconnect`** — calls Stripe `/oauth/deauthorize` (graceful if Vault missing), clears local fields.
+
+Frontend page `/agency/settings/stripe-callback` bounces partner back to their tenant origin after success. PaymentsTab in AgencySettings shows Connect/Disconnect buttons + status pill.
+
+### Phase E voll — Partner voice-agent CRUD
+
+Three new Edge Functions:
+- **`agency-create-integration`** — partner adds their own ElevenLabs/Retell/Vapi/OpenAI API key. agency_id auto-set.
+- **`agency-list-platform-agents`** — fetches platform agents from ElevenLabs/Retell API for a given (partner-owned or platform-default) integration.
+- **`agency-create-voice-agent`** — assigns a platform agent to a partner's customer with full agency_id verification on both customer and integration.
+
+Frontend:
+- `/agency/integrations` page — manage own provider accounts.
+- Voice-agent assignment dialog inline in `/agency/customers/:id`.
+- `Integrationen` nav item in AgencyShell.
+
+### Build verification
+
+Full local build chain runs clean:
+- `npx tsc --noEmit` — 0 errors (caught + fixed unused `ColorField` helper that would have killed Netlify).
+- `npm run build` — 1.45s, 200kB gzipped, no warnings beyond the routine Vite chunk-size hint.
+- Local preview snapshot shows OpenPenguin login rendering correctly with brand assets.
+
+### What still needs your input (Aleksa, in your time)
+
+| Action | Where | Effect |
+|---|---|---|
+| **Put `STRIPE_CONNECT_CLIENT_ID` in Vault** | Supabase Dashboard → Database → Vault → New Secret. Name: `STRIPE_CONNECT_CLIENT_ID`, value: `ca_…` from Stripe Dashboard → Connect → Onboarding-Einstellungen | Without this, "Mit Stripe verbinden" button returns a clear "vault_missing" error. Everything else works. |
+| **Register Stripe OAuth redirect URI** | Stripe Dashboard → Connect → Onboarding-Einstellungen → Redirect URIs → add `https://platform.openpenguin.de/agency/settings/stripe-callback` | Required by Stripe to allow the OAuth flow. |
+| **Put `NETLIFY_API_TOKEN` + `NETLIFY_SITE_ID` in Vault** | Same pattern. Token from https://app.netlify.com/user/applications, site_id from your Netlify site settings | Enables custom-domain auto-alias-add via `verify-custom-domain`. Without these, DNS verification still works; you just add the Netlify alias manually. |
+| **Wildcard DNS `*.openpenguin.de` → Netlify** | Your DNS provider (Cloudflare/etc.) | Without it, partner subdomains don't resolve. Until then, partner can use `https://platform.openpenguin.de/agency` and the tenant-detection falls back to default brand. |
+
+### Quick end-to-end flow you can test right now
+
+1. `https://platform.openpenguin.de/admin/requests` — should see Lisa-Patricia-test-signups or you trigger a new one.
+2. Click "Genehmigen & Einladen" on a pending request → check your inbox for the magic-link from `noreply@admin.openpenguin.de`.
+3. Click the link → land on `/agency-onboarding?request_id=…`.
+4. Pick slug like `test-partner` → next → display name + brand color → confirm.
+5. (Wildcard DNS missing) Redirect to `https://test-partner.openpenguin.de/agency` will 404 unless you set the wildcard — but `https://platform.openpenguin.de/agency` shows the same dashboard via the brand fallback.
+6. At the dashboard: Kunden → "+ Neuer Kunde". Integrationen → add a test ElevenLabs key. Customer detail → "+ Zuweisen" → pick agent. Settings → Whitelabel → change brand color → page reloads with new palette.
+7. `/platform-admin/agencies` (from your admin account) → should see your test partner with stats.
+
+### Total deployed Edge Functions on `puimwizupgkdvxpanlhy` (after Phase 1b)
+
+30 functions live. New in Phase 1 + 1b:
+- `admin-approve-as-agency`
+- `agency-finalize-onboarding`
+- `agency-create-customer`
+- `agency-create-integration`
+- `agency-create-voice-agent`
+- `agency-list-platform-agents`
+- `verify-custom-domain`
+- `stripe-connect-start`
+- `stripe-connect-callback`
+- `stripe-connect-disconnect`
+
+### Migrations applied this session (cumulative)
+
+- `008_multi_tenant_phase1.sql` — agencies table, agency_id columns, RLS rewrites
+- `009_public_agency_lookup.sql` — public `get_agency_branding` + `check_slug_availability` RPCs
+- `010_agency_branding_storage.sql` — Storage RLS for the `agency-branding` bucket
+
+---
+
+
 
 ## Multi-Tenant Phase 1 — what's live (2026-05-16, V4)
 
