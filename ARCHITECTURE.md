@@ -8,6 +8,12 @@
 
 Supabase Project `puimwizupgkdvxpanlhy`. All public tables have RLS enabled. `service_role` (used inside Edge Functions) bypasses RLS.
 
+> **Schema changes 2026-05-16:**
+> - New table `access_requests` (public signup-request form storage)
+> - New column `customers.customer_kind` (`voice_customer` | `platform_member`)
+>
+> See sections below for details.
+
 ### `auth.users` (Supabase built-in)
 
 Owned by Supabase Auth. We never read/write directly. Magic Link sign-in creates rows; our trigger `handle_new_user` mirrors them into `profiles`.
@@ -42,9 +48,10 @@ Used inside other tables' RLS to avoid recursive-RLS-on-profiles bugs.
 | `id` | uuid PK | gen_random_uuid() |
 | `name` | text not null | Display + invoice name |
 | `contact_email` | text not null | Where invitation lands |
-| `stripe_customer_id` | text unique | Set by `admin-create-customer` |
+| `stripe_customer_id` | text unique nullable | Set by `admin-create-customer`. NULL for `platform_member` |
 | `has_payment_method` | boolean default false | Flipped by `webhook-stripe` on `setup_intent.succeeded` |
 | `branding` | jsonb default '{}' | V2 whitelabel (logo, color) |
+| `customer_kind` | text not null default `'voice_customer'` | **(since 2026-05-16)** `voice_customer` or `platform_member`. CHECK constraint. Indexed |
 | `created_at`, `updated_at` | timestamptz | |
 
 **Trigger:** `on_customer_created` runs `create_default_permissions()` AFTER INSERT — creates a `customer_permissions` row with all FALSE.
@@ -52,6 +59,36 @@ Used inside other tables' RLS to avoid recursive-RLS-on-profiles bugs.
 **RLS:**
 - `admin_full_access_customers`: admin role
 - `owner_read_own_customer`: `id = current_user_customer_id()`
+
+**customer_kind interim model (since 2026-05-16):**
+- `voice_customer` (legacy default) — paying voice-agent clients with Stripe customer + subscriptions
+- `platform_member` — OpenPeng community members. No Stripe customer (skipped in admin-create-customer). Hidden from `/admin` overview (frontend filters). `CustomerDetail.tsx` blocks UI access with "Plattform-Mitglied — kein Zugriff"
+- Future: full Multi-Tenant Phase 1 migrates `platform_member` rows into a dedicated `agencies` table — see ROADMAP.md
+
+### `access_requests` (since 2026-05-16)
+
+Public signup-request storage. Anonymous visitors INSERT, admins SELECT and approve/reject.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | gen_random_uuid() |
+| `email` | text not null | OpenPeng community email |
+| `name` | text not null | Full name |
+| `message` | text nullable | Optional pitch |
+| `status` | text not null default `'pending'` | `pending` / `approved` / `rejected`. CHECK constraint |
+| `created_at` | timestamptz default now() | |
+| `processed_at` | timestamptz nullable | When admin acted |
+| `processed_by` | uuid FK auth.users.id nullable | Which admin |
+| `admin_note` | text nullable | Internal note |
+
+**Index:** `idx_access_requests_status (status, created_at DESC)` for fast pending-queue rendering.
+
+**RLS:**
+- `anyone_can_request` — `FOR INSERT WITH CHECK (true)` — anon role allowed
+- `admin_reads_all` — admin role only
+- `admin_updates_all` — admin role only
+
+**Flow:** `/signup` writes here → admin sees in `/admin/requests` → "Genehmigen" calls `adminCreateCustomer({name, email, kind: 'platform_member'})` → that triggers magic-link email via `admin-create-customer` Edge Function → access_request row updated to `status='approved'` + `processed_at/by` set.
 
 ### `customer_permissions`
 

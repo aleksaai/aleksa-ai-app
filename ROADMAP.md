@@ -40,9 +40,70 @@
 27. ✅ HANDOFF.md — current state
 28. ✅ ROADMAP.md — this file
 
+### V3 "OpenPeng Voice Rebrand + Community-Member Onboarding" (2026-05-16)
+
+29. ✅ Rebrand AleksaAI → **OpenPeng Voice** (UI, page title, email templates)
+30. ✅ Domain migration `app.aleksa.ai` → `platform.openpeng.de` (Supabase Auth + Edge Function APP_URL)
+31. ✅ Login: Magic-Link-only → **Email+Password + Google OAuth + Forgot-Password** (`/reset-password`)
+32. ✅ Public access-request flow: `/signup` page → `access_requests` table → `/admin/requests` review → approval triggers one-click magic-link → `/onboarding`
+33. ✅ Onboarding password-step (replaces magic-link-only setup)
+34. ✅ `/account` page — link/unlink Google identity, change password
+35. ✅ `customers.customer_kind` separation (`voice_customer` | `platform_member`) — community members hidden from admin overview, no Stripe customer created
+36. ✅ Cartoon-penguin logo + favicon (OpenPeng Voice brand mark)
+37. ✅ One-click magic-link in approval email (admin-create-customer now uses `supabase.auth.admin.generateLink({type:'invite'})` with direct redirect to `/onboarding?invitation_token=...`)
+38. ✅ Onboarding drops Stripe SetupIntent step for community members (they don't pay)
+
 ---
 
 ## 🔜 Next Up (priorities for upcoming sessions)
+
+### Multi-Tenant Agency Tier — Phase 1 (~1 week, the big one)
+
+The proper architectural fix for the current `customer_kind=platform_member` workaround.
+
+**DB schema:**
+- New `agencies` table: `id, owner_user_id, slug, display_name, custom_domain, custom_domain_status, brand_color, dashboard_logo_url, login_logo_url, favicon_url, website_title, loading_icon, max_customers, status, created_at, updated_at`
+- All existing customer-scoped tables (`customers`, `voice_agents`, `pricing_plans`, `integrations`) get an `agency_id` column. NULL = belongs to Aleksa directly (legacy voice_customer)
+- `profiles.role` enum extended: `platform_admin` | `agency_owner` | `customer_owner`. `profiles.agency_id` added for agency_owner rows
+- RLS-policies rewritten: every query scoped by `agency_id = current_user_agency_id()` (or platform_admin bypass)
+
+**Tenant detection:**
+- Frontend hook reads `window.location.hostname` on mount
+- `platform.openpeng.de` → platform-admin view (Aleksa)
+- `stephan.openpeng.de` → load agency where `slug='stephan'`, apply branding, show their dashboard
+- `app.kihelden.de` (custom domain) → lookup `agencies.custom_domain` match
+
+**Agency-Onboarding-Wizard:**
+- After `/signup` → admin approval → user gets magic-link
+- New Onboarding flow: chooses slug (e.g. `stephan` → `stephan.openpeng.de`), brand color, logo upload, optional custom domain
+- Netlify API call to add the chosen subdomain as a domain-alias to the site (so SSL provisions)
+
+**Agency-Dashboard (ChatDash-inspired):**
+- Sidebar: Home / Clients / Agents / Settings → Agency, Whitelabel, Integrations, Subscription
+- Member can: add their own ElevenLabs/Retell keys, add their own Stripe Connect, add their own customers, manage agents
+- Strict tenant isolation — Aleksa NEVER sees agency-owner data via UI (only via platform-admin override later)
+
+**Custom domain flow:**
+- Member enters `app.kihelden.de` → backend instructs CNAME setup → "Verifizieren" button checks DNS → Netlify API adds alias → SSL auto-provisions
+- Netlify Free supports ~50 domain aliases; if scale grows, switch to Cloudflare-for-SaaS or Caddy reverse proxy
+- ToS-Note: Reselling-Hosting requires paid Netlify Pro ($20/mo). For free community-perk model (0-10 members) Free tier is gray-zone OK; upgrade once monetized
+
+**Stripe Connect for agencies:**
+- Members OAuth-connect their own Stripe Account
+- Their customers pay them directly (Stripe Connect Standard model, agency keeps 100%, Aleksa charges no platform fee)
+
+**Migration of existing platform_member rows:** one-time SQL — for each customer with kind='platform_member', create an `agencies` row, set their profile.role='agency_owner', profile.agency_id, then DELETE the obsolete customers row
+
+### Smaller items (any session)
+
+- **webhook-retellai** Edge Function — Retell's post-call signature scheme, mirrors webhook-elevenlabs. Without this, Retell-agents have no calls in the `calls` table → analytics blank for Retell users
+- **Admin `/admin/agents/:id` Retell support** — Customer-AgentDetail is already platform-aware; admin AgentDetail still ElevenLabs-only labels
+- **Retell Knowledge Base** — currently Wissensbasis tab hidden for Retell. Retell has its own KB-API; implement parallel branch
+- **Email template polish** — Resend invite-email currently functional but plain. Add OpenPeng Voice logo + better layout
+- **Clean up legacy app.aleksa.ai domain** — decide: re-add as Netlify alias for backward compat, OR retire and let DNS expire
+- **Cleanup of community members already created as voice_customer** — if Aleksa approved any community signups before 2026-05-16, they're still in `/admin` customer list. SQL: `UPDATE customers SET customer_kind='platform_member' WHERE contact_email IN (SELECT email FROM access_requests WHERE status='approved')`
+
+### "Abrechnungen-Tab" (~1.5h) (legacy plan from V2 era)
 
 ### "Abrechnungen-Tab" (~1.5h)
 Replace flat "Pricing-Pakete" tab with two sub-tabs:
