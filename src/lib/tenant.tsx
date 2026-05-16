@@ -159,9 +159,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (row) {
         applyPaletteToRoot(deriveBrandPalette(row.brand_color))
         document.title = row.display_name
-        if (row.favicon_url) {
+        // Favicon: explicit favicon_url wins, otherwise fall back to logo_url
+        // (partners only upload a logo — we reuse it for the browser tab).
+        const iconHref = row.favicon_url ?? row.logo_url
+        if (iconHref) {
           const favicon = document.querySelector('link[rel="icon"]')
-          if (favicon instanceof HTMLLinkElement) favicon.href = row.favicon_url
+          if (favicon instanceof HTMLLinkElement) favicon.href = iconHref
         }
       } else {
         applyDefaultBrandingArtifacts()
