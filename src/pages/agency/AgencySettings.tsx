@@ -280,25 +280,167 @@ function WhitelabelTab({ agency, onUpdated }: { agency: Agency; onUpdated: (a: A
   )
 }
 
-// ─── Domain tab — Phase H wires custom domain verification ─────────────
-function DomainTab({ agency }: { agency: Agency; onUpdated: (a: Agency) => void }) {
+// ─── Domain tab — Phase H: editable custom domain + DNS verification ───
+function DomainTab({ agency, onUpdated }: { agency: Agency; onUpdated: (a: Agency) => void }) {
+  const [domain, setDomain] = useState(agency.custom_domain ?? '')
+  const [busy, setBusy] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [verifyResult, setVerifyResult] = useState<string | null>(null)
+
+  const saveDomain = async () => {
+    setBusy(true)
+    setError(null)
+    setVerifyResult(null)
+    try {
+      const cleaned = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+      if (cleaned && !/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/.test(cleaned)) {
+        throw new Error('Bitte gib eine gültige Domain ein (z.B. app.kihelden.de)')
+      }
+      const { data, error } = await supabase
+        .from('agencies')
+        .update({
+          custom_domain: cleaned || null,
+          custom_domain_status: cleaned ? 'pending_dns' : 'none',
+          custom_domain_verified_at: null,
+        })
+        .eq('id', agency.id)
+        .select()
+        .single()
+      if (error) throw new Error(error.message)
+      onUpdated(data as Agency)
+      setDomain(cleaned)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const verifyDomain = async () => {
+    setVerifying(true)
+    setError(null)
+    setVerifyResult(null)
+    try {
+      const { verifyCustomDomain } = await import('../../lib/api')
+      const r = await verifyCustomDomain()
+      if (r.ok) {
+        setVerifyResult(r.note ?? 'DNS verifiziert.')
+        // Reload to get fresh agency
+        const { data } = await supabase.from('agencies').select('*').eq('id', agency.id).maybeSingle()
+        if (data) onUpdated(data as Agency)
+      } else {
+        setError(r.detail ?? r.error ?? 'Verifizierung fehlgeschlagen.')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const cnameTarget = `${agency.slug}.openpenguin.de`
+
   return (
     <div className="glass-card-lg p-7">
       <p className="eyebrow mb-2">Domain</p>
       <h2 className="text-xl font-semibold tracking-tight text-ink">Eigene Domain</h2>
       <p className="mt-1.5 text-sm text-ink-muted">
-        Deine Plattform läuft automatisch unter <code className="rounded bg-white/60 px-1.5 py-0.5 text-xs">{agency.slug}.openpenguin.de</code>.
-        Optional kannst du eine eigene Domain hinzufügen (z.B. <code className="rounded bg-white/60 px-1.5 py-0.5 text-xs">app.deine-firma.de</code>).
+        Deine Plattform läuft automatisch unter{' '}
+        <code className="rounded bg-white/60 px-1.5 py-0.5 text-xs">{cnameTarget}</code>.
+        Optional kannst du eine eigene Domain einrichten (z.B.{' '}
+        <code className="rounded bg-white/60 px-1.5 py-0.5 text-xs">app.deine-firma.de</code>).
       </p>
 
       <div className="mt-6 space-y-5">
-        <Field label="Standard-Subdomain" value={`${agency.slug}.openpenguin.de`} />
-        <Field label="Eigene Domain" value={agency.custom_domain ?? '— nicht gesetzt'} />
-        <Field label="Status" value={agency.custom_domain_status === 'none' ? 'nicht konfiguriert' : agency.custom_domain_status} />
-      </div>
+        <div>
+          <label htmlFor="custom_domain" className="label-soft mb-1.5 block">Eigene Domain</label>
+          <input
+            id="custom_domain"
+            type="text"
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+            placeholder="app.deine-firma.de"
+            className="glass-input"
+            disabled={busy}
+          />
+          <p className="mt-1.5 text-xs text-ink-muted">
+            Volle Subdomain ohne https://, z.B. <code>app.kihelden.de</code>.
+          </p>
+        </div>
 
-      <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-800">
-        <strong>Phase H:</strong> CNAME-Konfiguration + DNS-Verifizierung + Netlify-Domain-Alias-Setup folgt in Kürze.
+        {agency.custom_domain && (
+          <>
+            <div>
+              <p className="label-soft mb-1.5">Status</p>
+              <div className="flex items-center gap-3">
+                {agency.custom_domain_status === 'verified' && (
+                  <span className="pill-success">✓ Verifiziert</span>
+                )}
+                {agency.custom_domain_status === 'pending_dns' && (
+                  <span className="pill-warn">DNS-Prüfung ausstehend</span>
+                )}
+                {agency.custom_domain_status === 'failed' && (
+                  <span className="pill-neutral" style={{ background: 'rgba(239,68,68,0.12)', color: '#b91c1c', borderColor: 'rgba(239,68,68,0.25)' }}>
+                    Verifizierung fehlgeschlagen
+                  </span>
+                )}
+                {agency.custom_domain_verified_at && (
+                  <span className="text-xs text-ink-muted">
+                    seit {new Date(agency.custom_domain_verified_at).toLocaleDateString('de-DE')}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {agency.custom_domain_status !== 'verified' && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-900">
+                <p className="font-semibold mb-2">DNS-Setup bei deinem Registrar:</p>
+                <p className="mb-2">
+                  Lege einen CNAME-Record an:
+                </p>
+                <pre className="overflow-x-auto rounded bg-white/70 p-2 text-[11px] font-mono">
+{`Type:   CNAME
+Name:   ${agency.custom_domain.split('.')[0]}
+Value:  ${cnameTarget}`}
+                </pre>
+                <p className="mt-2">
+                  DNS-Propagation kann 5–60 Minuten dauern. Danach unten auf "Verifizieren" klicken.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+        {verifyResult && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-700">
+            ✓ {verifyResult}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={saveDomain}
+            disabled={busy || verifying || domain === (agency.custom_domain ?? '')}
+            className="btn-primary"
+          >
+            {busy ? 'Speichere…' : agency.custom_domain ? 'Domain aktualisieren' : 'Domain hinzufügen'}
+          </button>
+          {agency.custom_domain && agency.custom_domain_status !== 'verified' && (
+            <button
+              onClick={verifyDomain}
+              disabled={busy || verifying}
+              className="btn-ghost"
+            >
+              {verifying ? 'Prüfe DNS…' : 'Verifizieren'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

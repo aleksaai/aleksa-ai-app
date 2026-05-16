@@ -30,6 +30,32 @@ export async function adminApproveAsAgency(access_request_id: string): Promise<{
   return data as any
 }
 
+// ─── verify-custom-domain (Multi-Tenant Phase H) ──────────────
+
+export async function verifyCustomDomain(): Promise<{
+  ok: boolean
+  cname_found: string | null
+  cname_expected: string
+  netlify?: 'added' | 'skipped_no_secrets' | 'failed'
+  netlify_error?: string | null
+  note?: string
+  error?: string
+  detail?: string
+}> {
+  const { data, error } = await supabase.functions.invoke('verify-custom-domain', { body: {} })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        return body as any
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  return data as any
+}
+
 // ─── agency-create-customer (Multi-Tenant Phase D) ─────────────
 
 export type AgencyCreateCustomerInput = {
