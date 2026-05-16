@@ -17,10 +17,15 @@ export function Admin() {
     setLoading(true)
     // Only show real voice-agent customers — platform members (community signups)
     // live in /admin/requests, not here.
+    // Platform admin sees ONLY master customers (agency_id IS NULL). Partner
+    // customers are accessible per-agency via /platform-admin/agencies — never
+    // mixed into the master overview. RLS still allows admin to read them all
+    // (needed for cross-tenant support), so the filter happens here.
     const { data } = await supabase
       .from('customers')
       .select('*')
       .eq('customer_kind', 'voice_customer')
+      .is('agency_id', null)
       .order('created_at', { ascending: false })
     setCustomers((data ?? []) as Customer[])
     setLoading(false)

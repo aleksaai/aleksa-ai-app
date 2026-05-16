@@ -22,6 +22,7 @@ export function Integrations() {
     const { data } = await supabase
       .from('integrations')
       .select('id, name, platform, region, active, created_at, updated_at')
+      .is('agency_id', null)
       .order('created_at', { ascending: false })
     setList((data ?? []) as Integration[])
     setLoading(false)

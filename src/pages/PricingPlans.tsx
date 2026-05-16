@@ -47,6 +47,7 @@ export function PricingPlans() {
       .from('pricing_plans')
       .select('*')
       .eq('archived', false)
+      .is('agency_id', null)
       .order('created_at', { ascending: false })
     if (!error && data) setPlans(data as PricingPlan[])
     setLoading(false)

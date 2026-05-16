@@ -30,6 +30,7 @@ export function AgentsList() {
           pricing_plans(name, type),
           customer_subscriptions(status)
         `)
+        .is('agency_id', null)
         .order('created_at', { ascending: false })
       setAgents((data ?? []) as Row[])
       setLoading(false)
