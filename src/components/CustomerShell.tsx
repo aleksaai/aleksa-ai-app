@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { useAuth } from '../lib/auth'
+import { useTenant } from '../lib/tenant'
 
 export function CustomerShell({
   children,
@@ -10,7 +11,10 @@ export function CustomerShell({
   pageAction,
   backTo,
   backLabel,
-  customerName,
+  // customerName is kept for backwards-compat but no longer rendered in the
+  // header — the header shows the agency brand (partner) so the customer
+  // sees who they bought through. Their own name lives inside page content.
+  customerName: _customerName,
   adminPreview,
   onExitPreview,
 }: {
@@ -25,6 +29,10 @@ export function CustomerShell({
   onExitPreview?: () => void
 }) {
   const { user, signOut } = useAuth()
+  const { agency } = useTenant()
+  const brandName = agency?.display_name ?? 'OpenPenguin Voice'
+  const brandLogo = agency?.logo_url ?? '/logo-color.png'
+  void _customerName
 
   return (
     <div className="relative min-h-screen overflow-x-clip">
@@ -40,10 +48,10 @@ export function CustomerShell({
       <div className="relative z-10 px-4 pt-4 lg:px-6 lg:pt-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between rounded-2xl glass px-4 py-3 lg:px-6">
           <Link to={adminPreview ? '#' : '/dashboard'} className="flex items-center gap-2.5">
-            <Logo />
+            <img src={brandLogo} alt={brandName} className="h-11 w-11 shrink-0 object-contain" />
             <div className="flex flex-col leading-none">
               <span className="text-base font-semibold tracking-tight text-ink">
-                {customerName ?? 'OpenPenguin Voice'}
+                {brandName}
               </span>
               {adminPreview && (
                 <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-amber-700">
@@ -115,8 +123,3 @@ export function CustomerShell({
   )
 }
 
-function Logo() {
-  return (
-    <img src="/logo-color.png" alt="OpenPenguin Voice" className="h-11 w-11 shrink-0 object-contain" />
-  )
-}

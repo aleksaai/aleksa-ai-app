@@ -1,7 +1,12 @@
 import { type ReactNode } from 'react'
 import { motion } from 'motion/react'
+import { useTenant } from '../lib/tenant'
 
 export function AuthShell({ children }: { children: ReactNode }) {
+  const { agency } = useTenant()
+  const brandName = agency?.display_name ?? 'OpenPenguin Voice'
+  const brandLogo = agency?.logo_url ?? '/logo-color.png'
+
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
       {/* Ambient background */}
@@ -20,8 +25,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
       >
         {/* Logo above card */}
         <div className="mb-6 flex flex-col items-center text-center">
-          <img src="/logo-color.png" alt="OpenPenguin Voice" className="mb-3 h-20 w-20 object-contain" />
-          <p className="text-sm font-semibold tracking-tight text-ink">OpenPenguin Voice</p>
+          <img src={brandLogo} alt={brandName} className="mb-3 h-20 w-20 object-contain" />
+          <p className="text-sm font-semibold tracking-tight text-ink">{brandName}</p>
         </div>
 
         <div className="glass-card-lg p-7">{children}</div>
