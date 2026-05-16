@@ -20,16 +20,6 @@ function json(data: unknown, status = 200) {
   })
 }
 
-async function vaultRead(sbAdmin: any, name: string): Promise<string | null> {
-  const { data, error } = await sbAdmin
-    .from('vault.decrypted_secrets' as any)
-    .select('decrypted_secret')
-    .eq('name', name)
-    .maybeSingle()
-  if (error) return null
-  return (data?.decrypted_secret as string | undefined) ?? null
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -69,7 +59,7 @@ Deno.serve(async (req) => {
       return json({ ok: true, message: 'no_connection_to_revoke' })
     }
 
-    const clientId = await vaultRead(sbAdmin, 'STRIPE_CONNECT_CLIENT_ID')
+    const clientId = Deno.env.get('STRIPE_CONNECT_CLIENT_ID')
     let stripeRevokeError: string | null = null
     if (clientId) {
       const r = await fetch('https://connect.stripe.com/oauth/deauthorize', {
@@ -90,7 +80,7 @@ Deno.serve(async (req) => {
         // up the lingering authorization in their Stripe Dashboard manually.
       }
     } else {
-      stripeRevokeError = 'STRIPE_CONNECT_CLIENT_ID missing in Vault — local record cleared but Stripe-side authorization may still exist'
+      stripeRevokeError = 'STRIPE_CONNECT_CLIENT_ID missing in Edge Function env — local record cleared but Stripe-side authorization may still exist'
     }
 
     await sbAdmin

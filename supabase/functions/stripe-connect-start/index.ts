@@ -24,16 +24,6 @@ function json(data: unknown, status = 200) {
   })
 }
 
-async function vaultRead(sbAdmin: any, name: string): Promise<string | null> {
-  const { data, error } = await sbAdmin
-    .from('vault.decrypted_secrets' as any)
-    .select('decrypted_secret')
-    .eq('name', name)
-    .maybeSingle()
-  if (error) return null
-  return (data?.decrypted_secret as string | undefined) ?? null
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
@@ -59,11 +49,11 @@ Deno.serve(async (req) => {
     if (profile?.role !== 'agency_owner') return json({ error: 'agency_owner_only' }, 403)
     if (!profile.agency_id) return json({ error: 'no_agency_assigned' }, 403)
 
-    const clientId = await vaultRead(sbAdmin, 'STRIPE_CONNECT_CLIENT_ID')
+    const clientId = Deno.env.get('STRIPE_CONNECT_CLIENT_ID')
     if (!clientId) {
       return json({
-        error: 'vault_missing_stripe_connect_client_id',
-        detail: 'STRIPE_CONNECT_CLIENT_ID muss in Postgres Vault liegen. Aleksa: Supabase Dashboard → Database → Vault → New Secret. Name: STRIPE_CONNECT_CLIENT_ID, Value: ca_... aus Stripe Dashboard → Connect → Onboarding-Einstellungen.',
+        error: 'missing_stripe_connect_client_id',
+        detail: 'STRIPE_CONNECT_CLIENT_ID muss als Edge Function Secret hinterlegt sein. Aleksa: Supabase Dashboard → Edge Functions → Secrets → New Secret. Name: STRIPE_CONNECT_CLIENT_ID, Value: ca_... aus Stripe Dashboard → Connect → Onboarding-Einstellungen.',
       }, 500)
     }
     if (!clientId.startsWith('ca_')) {

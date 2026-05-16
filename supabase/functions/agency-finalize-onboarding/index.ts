@@ -12,16 +12,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
 
 const BASE_DOMAIN = 'openpenguin.de'
 
-async function vaultRead(sbAdmin: any, name: string): Promise<string | null> {
-  const { data, error } = await sbAdmin
-    .from('vault.decrypted_secrets' as any)
-    .select('decrypted_secret')
-    .eq('name', name)
-    .maybeSingle()
-  if (error) return null
-  return (data?.decrypted_secret as string | undefined) ?? null
-}
-
 async function netlifyAddDomainAlias(
   netlifyToken: string,
   netlifySiteId: string,
@@ -161,8 +151,11 @@ Deno.serve(async (req) => {
     const partnerHostname = `${slug}.${BASE_DOMAIN}`
     let subdomainProvisioning: 'auto_added' | 'skipped_no_secrets' | 'failed' = 'skipped_no_secrets'
     let subdomainError: string | null = null
-    const netlifyToken = await vaultRead(sbAdmin, 'NETLIFY_API_TOKEN')
-    const netlifySiteId = await vaultRead(sbAdmin, 'NETLIFY_SITE_ID')
+    // NETLIFY_* live in Edge Function env (canonical Supabase pattern for
+    // server-side-only secrets — Vault is only needed when something outside
+    // the function needs cleartext access).
+    const netlifyToken = Deno.env.get('NETLIFY_API_TOKEN')
+    const netlifySiteId = Deno.env.get('NETLIFY_SITE_ID')
     if (netlifyToken && netlifySiteId) {
       const r = await netlifyAddDomainAlias(netlifyToken, netlifySiteId, partnerHostname)
       if (r.ok) subdomainProvisioning = 'auto_added'

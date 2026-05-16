@@ -39,22 +39,6 @@ async function lookupCname(domain: string): Promise<string | null> {
   return target || null
 }
 
-async function vaultSecret(sbAdmin: any, name: string): Promise<string | null> {
-  const { data } = await sbAdmin.rpc('get_vault_secret_or_null', { p_name: name }).maybeSingle()
-  return (data?.value as string | undefined) ?? null
-}
-
-// Fallback: query vault.decrypted_secrets directly via SQL
-async function vaultSecretSql(sbAdmin: any, name: string): Promise<string | null> {
-  const { data, error } = await sbAdmin
-    .from('vault.decrypted_secrets' as any)
-    .select('decrypted_secret')
-    .eq('name', name)
-    .maybeSingle()
-  if (error) return null
-  return (data?.decrypted_secret as string | undefined) ?? null
-}
-
 async function addNetlifyDomainAlias(
   netlifyToken: string,
   netlifySiteId: string,
@@ -146,8 +130,11 @@ Deno.serve(async (req) => {
     // Try to add Netlify domain alias if credentials are available
     let netlifyResult: 'added' | 'skipped_no_secrets' | 'failed' = 'skipped_no_secrets'
     let netlifyError: string | null = null
-    const netlifyToken = await vaultSecretSql(sbAdmin, 'NETLIFY_API_TOKEN')
-    const netlifySiteId = await vaultSecretSql(sbAdmin, 'NETLIFY_SITE_ID')
+    // Read from Edge Function env (canonical) — Vault was used here in an
+    // earlier draft but Aleksa stores his ops secrets in the standard
+    // Edge Function Secrets dashboard, so we read from Deno.env directly.
+    const netlifyToken = Deno.env.get('NETLIFY_API_TOKEN')
+    const netlifySiteId = Deno.env.get('NETLIFY_SITE_ID')
     if (netlifyToken && netlifySiteId) {
       const r = await addNetlifyDomainAlias(netlifyToken, netlifySiteId, agency.custom_domain)
       if (r.ok) netlifyResult = 'added'

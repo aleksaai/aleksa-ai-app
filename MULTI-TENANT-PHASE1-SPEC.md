@@ -140,11 +140,13 @@ Free Plan supports **~50 domain aliases** with per-alias Let's Encrypt SSL — P
 ToS-Note: Reselling-Hosting on Free is gray-zone (officially Netlify requires Pro for reselling). For Aleksa's free Community-Perk model with 0-10 members this is fine; upgrade to Pro once the platform is monetized or partner count grows past ~30.
 
 **Required setup before this works:**
-- `NETLIFY_API_TOKEN` stored in Vault (Aleksa creates a Personal Access Token at https://app.netlify.com/user/applications)
-- `NETLIFY_SITE_ID` for the openpenguin.de site stored in Vault
-- Wildcard CNAME `*.openpenguin.de` at IONOS pointing to the Netlify site host (one-time DNS setup — free, no Pro needed for the DNS record itself)
+- `NETLIFY_API_TOKEN` stored as **Edge Function Secret** (Supabase Dashboard → Edge Functions → Secrets — NOT Vault). Token from https://app.netlify.com/user/applications.
+- `NETLIFY_SITE_ID` stored as Edge Function Secret. UUID from Netlify Site → Site configuration → General → Site information.
+- Wildcard CNAME `*.openpenguin.de` at IONOS pointing to `openpenguin-voice.netlify.app` (one-time DNS setup — free).
 
-Once the Vault secrets are in place, `agency-finalize-onboarding` Edge Function automatically POSTs to Netlify's `/sites/{id}` API to add the partner's `{slug}.openpenguin.de` as a domain alias on each successful wizard completion — no manual Aleksa-side click per partner.
+**Storage decision (corrected 2026-05-16):** Edge Function Secrets (read via `Deno.env.get(...)`) are the canonical Supabase pattern for secrets that are *only* used server-side inside the function. Postgres Vault is the right place when something *outside* the Edge Function (e.g. Marcus running ad-hoc Management-API SQL to configure SMTP) needs cleartext access. For Netlify + Stripe Connect, the Edge Function is the only consumer — Edge Function Secrets is correct.
+
+Once both Edge Function secrets are in place, `agency-finalize-onboarding` automatically POSTs to Netlify's `PATCH /sites/{id}` API on each successful wizard completion to add the partner's `{slug}.openpenguin.de` as a domain alias — no manual Aleksa-side click per partner.
 
 ## Onboarding wizard
 
