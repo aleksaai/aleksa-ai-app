@@ -43,6 +43,24 @@ function HomeRedirect() {
 
   if (!user) return <Login />
 
+  // Phase-I rescue: if Supabase didn't honor the redirectTo from
+  // admin-approve-as-agency (we've seen this when the invite flow falls
+  // back to site_url and strips the query string), look at
+  // user.user_metadata.access_request_id — that field is embedded in the
+  // invite token's `data` payload, so it survives any redirect loss.
+  // When it's there AND the user hasn't yet been upgraded to agency_owner,
+  // route them into the agency wizard with the right request_id.
+  const accessRequestId =
+    (user.user_metadata as Record<string, unknown> | undefined)?.access_request_id
+  if (
+    accessRequestId &&
+    typeof accessRequestId === 'string' &&
+    profile?.role !== 'agency_owner' &&
+    !profile?.agency_id
+  ) {
+    return <Navigate to={`/agency-onboarding?request_id=${accessRequestId}`} replace />
+  }
+
   // Role-based redirect once profile is known.
   if (profile?.role === 'agency_owner') {
     // Agency owner without agency_id yet → onboarding flow (Phase I)

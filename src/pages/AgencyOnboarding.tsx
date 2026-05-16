@@ -17,7 +17,14 @@ export function AgencyOnboarding() {
   const { user, profile, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const requestId = searchParams.get('request_id') ?? undefined
+  // Defense-in-depth: try URL first (clean path from HomeRedirect fix),
+  // then fall back to user.user_metadata.access_request_id (set by the
+  // admin-approve-as-agency Edge Function as `data: { access_request_id }`
+  // in the invite token, so it survives any redirect-strip).
+  const requestId =
+    searchParams.get('request_id') ??
+    ((user?.user_metadata as Record<string, unknown> | undefined)?.access_request_id as string | undefined) ??
+    undefined
 
   // Magic-link arrivals don't have a password yet. Skip the step only if the
   // user already set one previously (tracked via user_metadata.password_set).

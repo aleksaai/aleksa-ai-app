@@ -35,6 +35,16 @@ export function Onboarding() {
     if (!user) return
     const run = async () => {
       try {
+        // Rescue: if this user actually belongs to the agency-onboarding
+        // flow (i.e. invite came from admin-approve-as-agency, not
+        // admin-create-customer), redirect them to the right wizard.
+        const accessRequestId = (user.user_metadata as Record<string, unknown> | undefined)
+          ?.access_request_id as string | undefined
+        if (accessRequestId) {
+          navigate(`/agency-onboarding?request_id=${accessRequestId}`, { replace: true })
+          return
+        }
+
         const tokenFromUrl = searchParams.get('invitation_token')
         const tokenFromMeta = (user.user_metadata as Record<string, unknown> | undefined)
           ?.invitation_token as string | undefined
