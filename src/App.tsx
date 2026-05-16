@@ -23,6 +23,8 @@ import { AgencyCustomers } from './pages/agency/AgencyCustomers'
 import { AgencyAgents } from './pages/agency/AgencyAgents'
 import { AgencySettings } from './pages/agency/AgencySettings'
 import { AgencyOnboarding } from './pages/AgencyOnboarding'
+import { AgencyCustomerNew } from './pages/agency/AgencyCustomerNew'
+import { AgencyCustomerDetail } from './pages/agency/AgencyCustomerDetail'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -191,6 +193,22 @@ export default function App() {
         element={
           <RequireAuth>
             <AgencyCustomers />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/customers/new"
+        element={
+          <RequireAuth>
+            <AgencyCustomerNew />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/customers/:id"
+        element={
+          <RequireAuth>
+            <AgencyCustomerDetail />
           </RequireAuth>
         }
       />

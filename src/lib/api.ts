@@ -30,6 +30,38 @@ export async function adminApproveAsAgency(access_request_id: string): Promise<{
   return data as any
 }
 
+// ─── agency-create-customer (Multi-Tenant Phase D) ─────────────
+
+export type AgencyCreateCustomerInput = {
+  name: string
+  contact_email: string
+}
+
+export async function agencyCreateCustomer(input: AgencyCreateCustomerInput): Promise<{
+  ok: true
+  customer_id: string
+  invitation_token: string
+  invite_link: string
+  email_sent: boolean
+  email_error: string | null
+}> {
+  const { data, error } = await supabase.functions.invoke('agency-create-customer', {
+    body: input,
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Unexpected response')
+  return data as any
+}
+
 // ─── agency-finalize-onboarding (Multi-Tenant Phase I) ─────────
 
 export type AgencyFinalizeInput = {
