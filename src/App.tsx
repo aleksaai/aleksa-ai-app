@@ -18,6 +18,10 @@ import { ResetPassword } from './pages/ResetPassword'
 import { Signup } from './pages/Signup'
 import { Requests } from './pages/Requests'
 import { Account } from './pages/Account'
+import { AgencyHome } from './pages/agency/AgencyHome'
+import { AgencyCustomers } from './pages/agency/AgencyCustomers'
+import { AgencyAgents } from './pages/agency/AgencyAgents'
+import { AgencySettings } from './pages/agency/AgencySettings'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -32,9 +36,13 @@ function HomeRedirect() {
 
   if (!user) return <Login />
 
-  // Role-based redirect once profile is known. Until profile loads, send admin to /admin by default.
+  // Role-based redirect once profile is known.
+  if (profile?.role === 'agency_owner') {
+    // Agency owner without agency_id yet → onboarding flow (Phase I)
+    if (!profile.agency_id) return <Navigate to="/agency-onboarding" replace />
+    return <Navigate to="/agency" replace />
+  }
   if (profile?.role === 'customer_owner') {
-    // If customer-owner is missing customer link OR payment method, route through onboarding
     if (!profile.customer_id) return <Navigate to="/onboarding" replace />
     return <Navigate to="/dashboard" replace />
   }
@@ -157,6 +165,39 @@ export default function App() {
         element={
           <RequireAuth>
             <CallDetail />
+          </RequireAuth>
+        }
+      />
+      {/* ============ AGENCY OWNER (PARTNER) ROUTES ============ */}
+      <Route
+        path="/agency"
+        element={
+          <RequireAuth>
+            <AgencyHome />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/customers"
+        element={
+          <RequireAuth>
+            <AgencyCustomers />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/agents"
+        element={
+          <RequireAuth>
+            <AgencyAgents />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/settings"
+        element={
+          <RequireAuth>
+            <AgencySettings />
           </RequireAuth>
         }
       />
