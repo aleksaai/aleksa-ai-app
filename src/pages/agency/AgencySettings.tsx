@@ -446,8 +446,46 @@ Value:  ${cnameTarget}`}
   )
 }
 
-// ─── Payments tab — Phase G wires Stripe Connect ───────────────────────
-function PaymentsTab({ agency }: { agency: Agency; onUpdated: (a: Agency) => void }) {
+// ─── Payments tab — Phase G: Stripe Connect OAuth flow ────────────────
+function PaymentsTab({ agency, onUpdated }: { agency: Agency; onUpdated: (a: Agency) => void }) {
+  const [busy, setBusy] = useState<'connect' | 'disconnect' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleConnect = async () => {
+    setBusy('connect')
+    setError(null)
+    try {
+      const { stripeConnectStart } = await import('../../lib/api')
+      const r = await stripeConnectStart(window.location.origin)
+      // Redirect into Stripe's OAuth screen
+      window.location.href = r.url
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setBusy(null)
+    }
+  }
+
+  const handleDisconnect = async () => {
+    if (!confirm('Stripe-Verbindung trennen? Du kannst danach keine Kunden mehr direkt abrechnen.')) return
+    setBusy('disconnect')
+    setError(null)
+    try {
+      const { stripeConnectDisconnect } = await import('../../lib/api')
+      const r = await stripeConnectDisconnect()
+      const { data } = await supabase.from('agencies').select('*').eq('id', agency.id).maybeSingle()
+      if (data) onUpdated(data as Agency)
+      if (r.stripe_revoke_error) {
+        setError(`Lokal getrennt, aber Stripe meldete: ${r.stripe_revoke_error}`)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const isConnected = agency.stripe_connect_status === 'active' && agency.stripe_connect_account_id
+
   return (
     <div className="glass-card-lg p-7">
       <p className="eyebrow mb-2">Zahlungen</p>
@@ -458,19 +496,56 @@ function PaymentsTab({ agency }: { agency: Agency; onUpdated: (a: Agency) => voi
       </p>
 
       <div className="mt-6 space-y-5">
-        <Field label="Status" value={
-          agency.stripe_connect_status === 'active' ? '✓ Aktiv' :
-          agency.stripe_connect_status === 'pending' ? 'Wird aktiviert…' :
-          agency.stripe_connect_status === 'disconnected' ? 'Getrennt' :
-          '— nicht verbunden'
-        } />
+        <div>
+          <p className="label-soft mb-1.5">Status</p>
+          <div className="flex items-center gap-3">
+            {isConnected && <span className="pill-success">✓ Verbunden</span>}
+            {agency.stripe_connect_status === 'pending' && <span className="pill-warn">Wird aktiviert…</span>}
+            {agency.stripe_connect_status === 'disconnected' && <span className="pill-neutral">Getrennt</span>}
+            {agency.stripe_connect_status === 'none' && <span className="pill-neutral">Nicht verbunden</span>}
+          </div>
+        </div>
         {agency.stripe_connect_account_id && (
           <Field label="Stripe Account ID" value={agency.stripe_connect_account_id} />
         )}
       </div>
 
-      <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-800">
-        <strong>Phase G:</strong> Stripe-Connect-OAuth-Flow folgt in Kürze. Solange behandelt Aleksa Kunden-Billing manuell für dich.
+      {error && (
+        <div className="mt-5 rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700 whitespace-pre-wrap">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-6 flex gap-2">
+        {!isConnected && (
+          <button
+            onClick={handleConnect}
+            disabled={busy !== null}
+            className="btn-primary"
+          >
+            {busy === 'connect' ? 'Leite weiter…' : 'Mit Stripe verbinden'}
+          </button>
+        )}
+        {isConnected && (
+          <button
+            onClick={handleDisconnect}
+            disabled={busy !== null}
+            className="btn-ghost"
+          >
+            {busy === 'disconnect' ? 'Trenne…' : 'Verbindung trennen'}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white/40 p-4 text-xs text-ink-muted leading-relaxed">
+        <p className="font-semibold text-ink-soft mb-1">Wie funktioniert das?</p>
+        <p>
+          Klick auf "Mit Stripe verbinden" → du wirst zu Stripe weitergeleitet → du
+          autorisierst OpenPenguin Voice → wir kriegen deine Stripe-Account-ID
+          (kein Zugriff auf deine Daten, nur Charge-Authority für deine Kunden).
+          Pro Charge zahlst du Stripe-Standard-Gebühren (≈1,4% + 0,25€ EU);
+          OpenPenguin Voice behält 0%.
+        </p>
       </div>
     </div>
   )

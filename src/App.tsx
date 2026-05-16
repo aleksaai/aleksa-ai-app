@@ -27,6 +27,7 @@ import { AgencyCustomerNew } from './pages/agency/AgencyCustomerNew'
 import { AgencyCustomerDetail } from './pages/agency/AgencyCustomerDetail'
 import { PlatformAdminAgencies } from './pages/PlatformAdminAgencies'
 import { PlatformAdminAgencyDetail } from './pages/PlatformAdminAgencyDetail'
+import { StripeConnectCallback } from './pages/StripeConnectCallback'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -245,6 +246,14 @@ export default function App() {
         element={
           <RequireAuth>
             <AgencySettings />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/settings/stripe-callback"
+        element={
+          <RequireAuth>
+            <StripeConnectCallback />
           </RequireAuth>
         }
       />

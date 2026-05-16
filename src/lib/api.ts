@@ -30,6 +30,70 @@ export async function adminApproveAsAgency(access_request_id: string): Promise<{
   return data as any
 }
 
+// ─── Stripe Connect (Multi-Tenant Phase G) ─────────────────────
+
+export async function stripeConnectStart(origin?: string): Promise<{
+  ok: true
+  url: string
+  redirect_uri: string
+}> {
+  const { data, error } = await supabase.functions.invoke('stripe-connect-start', {
+    body: { origin: origin ?? window.location.origin },
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Unexpected response')
+  return data as any
+}
+
+export async function stripeConnectCallback(input: { code: string; state: string }): Promise<{
+  ok: true
+  stripe_user_id: string
+  origin: string | null
+}> {
+  const { data, error } = await supabase.functions.invoke('stripe-connect-callback', { body: input })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Unexpected response')
+  return data as any
+}
+
+export async function stripeConnectDisconnect(): Promise<{
+  ok: true
+  stripe_revoke_error: string | null
+  message?: string
+}> {
+  const { data, error } = await supabase.functions.invoke('stripe-connect-disconnect', { body: {} })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Unexpected response')
+  return data as any
+}
+
 // ─── verify-custom-domain (Multi-Tenant Phase H) ──────────────
 
 export async function verifyCustomDomain(): Promise<{
