@@ -74,11 +74,16 @@ Partners-Onboarding ist End-to-End live. Aleksa kann jetzt Community-Member als 
 
 ### Multi-Tenant Phase 1c (smaller follow-ups, post Phase 1b)
 
+- **Cross-subdomain auth (regressed in fbfd852)** — partner currently sees a login page after wizard finalizes on the new subdomain. Two viable approaches:
+  - Cloudflare for SaaS Custom Hostnames API (gratis up to 100, then $0.10/hostname/month — also handles Custom-Domain partner sites with auto-SSL)
+  - Edge Function that mints a short-lived signed JWT on the source subdomain + `/auth/handoff?token=...` consumer on the destination. No vendor dependency, but needs careful HMAC verification + replay protection.
+- **Supabase invite flow redirectTo workaround** — currently rescued in three places (HomeRedirect / AgencyOnboarding / Onboarding) via `user.user_metadata.access_request_id`. Long-term: either watch for a Supabase fix OR fully migrate from invite flow to a custom flow that doesn't rely on Supabase's redirect plumbing.
 - **Per-connected-account billing logic** — webhook-stripe extension to route Connected-Account events (event.account = acct_…) to the correct agency; partner-side subscription creation on their Stripe; pricing_plans-per-agency
 - **Per-agency email templates** — Resend domain per agency (each partner verifies their own sender), partner-branded Welcome/Magic-Link emails
 - **Per-agency analytics** — call cost margin tracking with partner-currency conversion, drill-down by agency
 - **Partner-side voice-agent editing** — Prompt/Voice/KB tabs in `/agency/agents/:id` (currently Aleksa-handled via existing `/admin/agents/:id`)
 - **Agency Pricing-Plans UI** — partner creates own plans + assigns them to customer voice-agents
+- **Storage bucket creation via Management API** — current pattern is SQL INSERT into `storage.buckets` (POST /storage/buckets returns 404). Document the SQL approach in ARCHITECTURE.md if it stays the workaround.
 
 ### Multi-Tenant Agency Tier — Phase 1 (~1 week, the big one) [SUPERSEDED — see V4 above]
 

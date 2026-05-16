@@ -4,7 +4,105 @@
 
 ## Last update
 
-**2026-05-16** — Marcus (Multi-Tenant Phase 1b shipped: Stripe Connect Standard flow, Platform-admin override UI, Partner-side voice-agent CRUD with own integrations. Phase 1 build is now feature-complete; only Vault-secret prereqs + Aleksa-side DNS-wildcard remain before partners can be live-onboarded.)
+**2026-05-16 (late session)** — Marcus (Phase 1b end-of-session sweep: prereqs all done, several follow-up bugs found + patched during initial end-to-end test, one bug fix not yet verified by Aleksa. See "Phase 1b — verification status" section below.)
+
+## Phase 1b — verification status (snapshot 2026-05-16 17:00)
+
+### What's confirmed working
+
+- **Wildcard DNS `*.openpenguin.de` → `openpenguin-voice.netlify.app`** ✓ verified via `dig`
+- **Netlify Edge Function Secrets present:** `NETLIFY_API_TOKEN`, `NETLIFY_SITE_ID` ✓
+- **Stripe Connect Edge Function Secret present:** `STRIPE_CONNECT_CLIENT_ID` (test mode, `ca_TFKLy78...`) ✓
+- **Stripe Dashboard:** Connect Redirect URI `https://platform.openpenguin.de/agency/settings/stripe-callback` registered ✓
+- **Custom SMTP via Resend:** working (verified Auth-Config snapshot shows `smtp_host=smtp.resend.com`, `smtp_pass=<set>`, `smtp_max_frequency=1` after fix)
+- **Frontend Build:** `tsc --noEmit` clean, `vite build` clean (~1.4s, 200kB gzipped)
+- **30 Edge Functions deployed** on `puimwizupgkdvxpanlhy`
+
+### What's NOT yet verified end-to-end
+
+The first full partner-onboarding flow on `aleksa@destinymedia.de` hit three sequential bugs:
+1. Wizard had no password step → fixed in `2a70b06`
+2. SMTP throttle was 60s/user → relaxed to 1s
+3. Supabase Auth's `redirectTo` for invite flow stripped query → rescue layer added in `654000a`
+
+After `654000a`, **Aleksa had not yet retried the end-to-end test** when the session ended. The aleksa@destinymedia.de user is still in `auth.users` with `role=customer_owner, agency_id=null, user_metadata.access_request_id` set. Next session should be able to:
+- Hard-refresh the inkognito tab where the user currently sits on the broken `/onboarding` screen
+- The HomeRedirect rescue should now route them to `/agency-onboarding?request_id=44e63ffb-...`
+- Wizard should run to completion (password → slug → branding → confirm)
+- Subdomain `https://{slug}.openpenguin.de/agency` should resolve (Wildcard CNAME ✓ + Netlify-alias-auto-add via the Edge Function)
+- **Cross-subdomain session sharing is currently disabled** (see Known Regressions below) — partner will need to log in once manually on the new subdomain with the password they just set
+
+If the wizard fails again, the new error UI (`3bf3686`) will display the real Edge Function error message — paste that into the next session and we can debug specifically.
+
+## Phase 1b commits (chronological, since OpenPenguin rebrand)
+
+```
+654000a Fix: route partner correctly even when Supabase magic-link strips query
+fbfd852 HOT-FIX: revert chunked-cookie session adapter — everyone got locked out
+2a70b06 AgencyOnboarding: add password step + smtp throttle dropped 60s → 1s
+3bf3686 api.ts: extract real Edge Function errors instead of generic message
+9300f70 Role-gate every /admin, /agency, /dashboard route
+14bce20 Pre-test polish: cross-subdomain session + admin-self-onboarding guard (cookie adapter reverted later in fbfd852)
+b77f70c 4 Edge Functions: switch from Vault to Edge Function env
+182284c agency-finalize-onboarding: auto-add Netlify domain alias on wizard finalize
+6016cdc Multi-Tenant Phase 1b complete: docs + cleanup
+934878b Multi-Tenant Phase E voll: partner voice-agent CRUD
+517193c Multi-Tenant Phase G: Stripe Connect Standard flow
+559447c Multi-Tenant Phase J: platform-admin agency override UI
+ed0e48a Multi-Tenant Phase 1: HANDOFF.md updated with shipped/deferred breakdown
+1adc121 Multi-Tenant Phase H: custom domain verification + Netlify-alias hook
+a3550e5 Multi-Tenant Phase F: whitelabel editor + Storage bucket
+c82c10e Multi-Tenant Phase D: partner customer creation + detail view
+70e38dc Multi-Tenant Phase I: agency onboarding wizard end-to-end
+4077690 Multi-Tenant Phase C: agency dashboard skeleton
+e35a2a4 Multi-Tenant Phase A+B: agencies schema + tenant detection + branding
+195d31c Switch Resend sender domain to noreply@admin.openpenguin.de
+```
+
+## Known regressions / known bugs
+
+### 1. Cross-subdomain session sharing is regressed (fbfd852 revert)
+
+A chunked-cookie storage adapter was added (commit `14bce20`) to share the Supabase auth session across `*.openpenguin.de` subdomains. It locked every account out in practice — likely because the adapter changed `storageKey` (invalidating existing sessions) AND the chunked-cookie reassembly proved fragile for tokens above the per-cookie 4KB limit. Reverted to default localStorage in `fbfd852`.
+
+**Effect on partner UX:** after the onboarding wizard finishes, the partner is redirected to `https://{slug}.openpenguin.de/agency` and will hit the login page on the new subdomain (different origin = different localStorage). They use the password they just set during the wizard's password step (commit `2a70b06`). Annoying single login click, not broken.
+
+**Fix plan (Phase 1c):** either Cloudflare-for-SaaS custom hostnames (gratis tier covers up to 100 hostnames) or a signed-token Edge Function that mints a short-lived JWT on the source subdomain and redirects to the target subdomain's `/auth/handoff?token=...` page.
+
+### 2. Supabase Auth `redirectTo` not reliably honored in invite flow
+
+Observed 2026-05-16: `auth.admin.generateLink({type: 'invite', options: { redirectTo: '...path?query=...' }})` does NOT reliably send the user to the specified URL. In the observed case Supabase fell back to `site_url='/'` and the query string was stripped. `uri_allow_list` already covers `https://platform.openpenguin.de/**` so it's not an allow-list issue. This may be specific to the invite flow or to fresh-user state.
+
+**Workaround in place (`654000a`):** the `admin-approve-as-agency` Edge Function embeds `access_request_id` in the invite token's `data` payload, where it lands in `user.user_metadata.access_request_id`. Three rescue layers (HomeRedirect, AgencyOnboarding fallback, Onboarding bail-out) use that metadata field to route the user to the right wizard even when the URL has lost the query string. **Not yet verified by Aleksa as of session end.**
+
+### 3. `aleksa@destinymedia.de` test user is stuck in `auth.users`
+
+Test partner who hit bug #2 above. Currently sitting at `role=customer_owner, agency_id=null` with the access_request approved. Next session can either:
+- Have Aleksa just hard-refresh in the inkognito tab — the rescue logic should kick in and complete the wizard
+- OR clean up: delete the auth.user + delete the access_request, start fresh
+
+DB inventory at session end:
+```sql
+SELECT count(*) FROM access_requests;  -- 1 (the destinymedia approved request)
+SELECT count(*) FROM agencies;         -- 0
+SELECT count(*) FROM auth.users WHERE email LIKE '%destinymedia%';  -- 1
+```
+
+## What the next session should do first
+
+1. **Read this section + the verification status above** — context is fresh, no need to re-debug
+2. **Ask Aleksa: did the destinymedia hard-refresh + rescue routing work?** If yes → wizard should have completed → first real agency should exist → continue with smoke-testing the partner dashboard. If no → he should send the actual error message (now visible thanks to `3bf3686`)
+3. **Phase 1c backlog** (in `ROADMAP.md`):
+   - Cross-subdomain auth (Cloudflare for SaaS evaluation OR signed-token Edge Function)
+   - webhook-stripe extension for Connected-Account events (currently logs but doesn't route)
+   - Per-agency Resend domain / email templates
+   - Partner-side voice-agent editor (Prompt / Voice / KB tabs in `/agency/agents/:id`)
+   - Agency-pricing-plans UI
+   - Live-Mode Stripe migration (when ready)
+
+---
+
+
 
 ## Multi-Tenant Phase 1b — what landed (2026-05-16, V5)
 
