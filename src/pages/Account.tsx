@@ -4,7 +4,6 @@
 // Works for both admin and customer-owner — we wrap in the appropriate shell.
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { useAuth } from '../lib/auth'
 import { supabase } from '../lib/supabase'
@@ -23,7 +22,6 @@ type Identity = {
 
 export function Account() {
   const { user, profile } = useAuth()
-  const navigate = useNavigate()
   const [identities, setIdentities] = useState<Identity[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
