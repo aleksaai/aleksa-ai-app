@@ -59,18 +59,11 @@ function HomeRedirect() {
 export default function App() {
   return (
     <Routes>
+      {/* Public + universal */}
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/invite/:token" element={<Invite />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/signup" element={<Signup />} />
-      <Route
-        path="/admin/requests"
-        element={
-          <RequireAuth>
-            <Requests />
-          </RequireAuth>
-        }
-      />
       <Route
         path="/account"
         element={
@@ -79,26 +72,28 @@ export default function App() {
           </RequireAuth>
         }
       />
+
+      {/* ============ ADMIN (Aleksa-only) ============ */}
       <Route
-        path="/onboarding"
+        path="/admin"
         element={
-          <RequireAuth>
-            <Onboarding />
+          <RequireAuth requireRole="admin">
+            <Admin />
           </RequireAuth>
         }
       />
       <Route
-        path="/admin"
+        path="/admin/requests"
         element={
-          <RequireAuth>
-            <Admin />
+          <RequireAuth requireRole="admin">
+            <Requests />
           </RequireAuth>
         }
       />
       <Route
         path="/admin/agents"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <AgentsList />
           </RequireAuth>
         }
@@ -106,7 +101,7 @@ export default function App() {
       <Route
         path="/admin/agents/:id"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <AgentDetail />
           </RequireAuth>
         }
@@ -114,7 +109,7 @@ export default function App() {
       <Route
         path="/admin/integrations"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <Integrations />
           </RequireAuth>
         }
@@ -122,7 +117,7 @@ export default function App() {
       <Route
         path="/admin/pricing-plans"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <PricingPlans />
           </RequireAuth>
         }
@@ -130,7 +125,7 @@ export default function App() {
       <Route
         path="/admin/customers/:id"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <CustomerDetail />
           </RequireAuth>
         }
@@ -138,48 +133,23 @@ export default function App() {
       <Route
         path="/admin/customers/:id/view"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <CustomerPreview />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <RequireAuth>
-            <Dashboard />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/dashboard/agents/:id/*"
-        element={
-          <RequireAuth>
-            <CustomerAgentDetail />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/dashboard/calls/:id"
-        element={
-          <RequireAuth>
-            <CallDetail />
           </RequireAuth>
         }
       />
       <Route
         path="/admin/calls/:id"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <CallDetail />
           </RequireAuth>
         }
       />
-      {/* ============ PLATFORM-ADMIN ROUTES (Aleksa-only) ============ */}
       <Route
         path="/platform-admin/agencies"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <PlatformAdminAgencies />
           </RequireAuth>
         }
@@ -187,13 +157,16 @@ export default function App() {
       <Route
         path="/platform-admin/agencies/:id"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="admin">
             <PlatformAdminAgencyDetail />
           </RequireAuth>
         }
       />
 
-      {/* ============ AGENCY OWNER (PARTNER) ROUTES ============ */}
+      {/* ============ AGENCY OWNER (Partner) ============ */}
+      {/* /agency-onboarding intentionally only requires auth — the user's role
+          may still be customer_owner before they finish the wizard, so we
+          can't role-gate this one. */}
       <Route
         path="/agency-onboarding"
         element={
@@ -205,7 +178,7 @@ export default function App() {
       <Route
         path="/agency"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <AgencyHome />
           </RequireAuth>
         }
@@ -213,7 +186,7 @@ export default function App() {
       <Route
         path="/agency/customers"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <AgencyCustomers />
           </RequireAuth>
         }
@@ -221,7 +194,7 @@ export default function App() {
       <Route
         path="/agency/customers/new"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <AgencyCustomerNew />
           </RequireAuth>
         }
@@ -229,7 +202,7 @@ export default function App() {
       <Route
         path="/agency/customers/:id"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <AgencyCustomerDetail />
           </RequireAuth>
         }
@@ -237,7 +210,7 @@ export default function App() {
       <Route
         path="/agency/agents"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <AgencyAgents />
           </RequireAuth>
         }
@@ -245,7 +218,7 @@ export default function App() {
       <Route
         path="/agency/integrations"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <AgencyIntegrations />
           </RequireAuth>
         }
@@ -253,7 +226,7 @@ export default function App() {
       <Route
         path="/agency/settings"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <AgencySettings />
           </RequireAuth>
         }
@@ -261,11 +234,48 @@ export default function App() {
       <Route
         path="/agency/settings/stripe-callback"
         element={
-          <RequireAuth>
+          <RequireAuth requireRole="agency_owner">
             <StripeConnectCallback />
           </RequireAuth>
         }
       />
+
+      {/* ============ CUSTOMER OWNER (End Customers) ============ */}
+      {/* /onboarding intentionally not role-gated — auth.users may not yet
+          have the customer_id linked in profiles. */}
+      <Route
+        path="/onboarding"
+        element={
+          <RequireAuth>
+            <Onboarding />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <RequireAuth requireRole="customer_owner">
+            <Dashboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard/agents/:id/*"
+        element={
+          <RequireAuth requireRole="customer_owner">
+            <CustomerAgentDetail />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/dashboard/calls/:id"
+        element={
+          <RequireAuth requireRole="customer_owner">
+            <CallDetail />
+          </RequireAuth>
+        }
+      />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
