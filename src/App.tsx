@@ -14,6 +14,7 @@ import { AgentsList } from './pages/AgentsList'
 import { AgentDetail } from './pages/AgentDetail'
 import { CustomerAgentDetail } from './pages/CustomerAgentDetail'
 import { CallDetail } from './pages/CallDetail'
+import { ResetPassword } from './pages/ResetPassword'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -42,6 +43,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/invite/:token" element={<Invite />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         path="/onboarding"
         element={
