@@ -1,6 +1,6 @@
 // /agency-onboarding — multi-step wizard for new partners.
 // Reached via magic-link after an admin approves an access_request.
-// Steps: 1) Slug, 2) Branding (display_name + color), 3) Confirm → finalize.
+// Steps: 1) Password (if not yet set), 2) Slug, 3) Branding, 4) Confirm.
 // After finalize the partner is redirected to their tenant subdomain.
 
 import { useEffect, useState, type FormEvent } from 'react'
@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase'
 import { agencyFinalizeOnboarding } from '../lib/api'
 import { AuthShell } from '../components/AuthShell'
 
-type Step = 'slug' | 'branding' | 'confirm' | 'done'
+type Step = 'password' | 'slug' | 'branding' | 'confirm' | 'done'
 
 export function AgencyOnboarding() {
   const { user, profile, loading: authLoading } = useAuth()
@@ -19,13 +19,27 @@ export function AgencyOnboarding() {
   const [searchParams] = useSearchParams()
   const requestId = searchParams.get('request_id') ?? undefined
 
-  const [step, setStep] = useState<Step>('slug')
+  // Magic-link arrivals don't have a password yet. Skip the step only if the
+  // user already set one previously (tracked via user_metadata.password_set).
+  const passwordAlreadySet =
+    (user?.user_metadata as Record<string, unknown> | undefined)?.password_set === true
+
+  const [step, setStep] = useState<Step>(passwordAlreadySet ? 'slug' : 'password')
+  const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
   const [slug, setSlug] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [brandColor, setBrandColor] = useState('#66A4FF')
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'free' | 'taken'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Adjust the initial step if user_metadata loads later.
+  useEffect(() => {
+    if (passwordAlreadySet && step === 'password') {
+      setStep('slug')
+    }
+  }, [passwordAlreadySet, step])
 
   // If the user already has an agency, send them home.
   useEffect(() => {
@@ -50,10 +64,33 @@ export function AgencyOnboarding() {
     return () => clearTimeout(timer)
   }, [slug])
 
+  const handleNextPassword = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (password.length < 8) {
+      setError('Mindestens 8 Zeichen.')
+      return
+    }
+    if (password !== passwordConfirm) {
+      setError('Die Passwörter stimmen nicht überein.')
+      return
+    }
+    setBusy(true)
+    const { error: upErr } = await supabase.auth.updateUser({
+      password,
+      data: { password_set: true },
+    })
+    setBusy(false)
+    if (upErr) {
+      setError(upErr.message)
+      return
+    }
+    setStep('slug')
+  }
+
   const handleNextSlug = (e: FormEvent) => {
     e.preventDefault()
     if (slugStatus !== 'free') return
-    // Pre-fill displayName with a title-cased slug if empty
     if (!displayName) {
       setDisplayName(slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()))
     }
@@ -103,11 +140,13 @@ export function AgencyOnboarding() {
     )
   }
 
+  const totalSteps = passwordAlreadySet ? 3 : 4
+
   return (
     <AuthShell>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
         <div>
-          <p className="eyebrow mb-1.5">Partner-Setup · {stepLabel(step)}</p>
+          <p className="eyebrow mb-1.5">Partner-Setup · {stepLabel(step, passwordAlreadySet, totalSteps)}</p>
           <h1 className="text-2xl font-semibold tracking-tight">
             Dein eigenes <span className="heading-accent">Whitelabel</span>
           </h1>
@@ -115,6 +154,57 @@ export function AgencyOnboarding() {
             Wir richten in 2 Minuten deine eigene Voice-Agent-Plattform unter <code className="rounded bg-white/60 px-1.5 py-0.5 text-xs">{slug || 'deinslug'}.openpenguin.de</code> ein.
           </p>
         </div>
+
+        {step === 'password' && (
+          <form onSubmit={handleNextPassword} className="space-y-4">
+            <div>
+              <label htmlFor="pw_new" className="label-soft mb-2 block">Wähle ein Passwort</label>
+              <input
+                id="pw_new"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mindestens 8 Zeichen"
+                className="glass-input"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                autoFocus
+                disabled={busy}
+              />
+              <p className="mt-1.5 text-xs text-ink-muted">
+                Damit du dich später auf <code className="rounded bg-white/60 px-1 py-0.5">{slug || 'deinslug'}.openpenguin.de</code> ohne Magic-Link einloggen kannst.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="pw_confirm" className="label-soft mb-2 block">Passwort wiederholen</label>
+              <input
+                id="pw_confirm"
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                placeholder="••••••••"
+                className="glass-input"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                disabled={busy}
+              />
+            </div>
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={busy || !password || !passwordConfirm}
+              className="btn-primary w-full"
+            >
+              {busy ? 'Speichere…' : 'Weiter →'}
+            </button>
+          </form>
+        )}
 
         {step === 'slug' && (
           <form onSubmit={handleNextSlug} className="space-y-4">
@@ -234,13 +324,16 @@ export function AgencyOnboarding() {
   )
 }
 
-function stepLabel(step: Step): string {
-  switch (step) {
-    case 'slug': return 'Schritt 1 von 3'
-    case 'branding': return 'Schritt 2 von 3'
-    case 'confirm': return 'Schritt 3 von 3'
-    case 'done': return 'Fertig'
-  }
+function stepLabel(step: Step, passwordAlreadySet: boolean, total: number): string {
+  // Map each step to its 1-based index given the dynamic total.
+  // Order: password (if needed) → slug → branding → confirm → done
+  const sequence: Step[] = passwordAlreadySet
+    ? ['slug', 'branding', 'confirm']
+    : ['password', 'slug', 'branding', 'confirm']
+  const idx = sequence.indexOf(step)
+  if (step === 'done') return 'Fertig'
+  if (idx < 0) return ''
+  return `Schritt ${idx + 1} von ${total}`
 }
 
 function Row({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
