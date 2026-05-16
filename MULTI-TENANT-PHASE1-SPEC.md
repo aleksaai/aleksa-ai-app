@@ -134,12 +134,17 @@ Standard model (recommended for Aleksa's case: Partners keep 100%, no platform f
 5. SSL provisions automatically via Netlify (~minutes)
 6. Status visible in UI; auto-poll Netlify SSL status
 
-**Netlify Free Plan limit:** ~5 domain aliases. Will warn Partner via UI when nearing limit; Aleksa upgrades to Pro ($20/mo) when scaling.
+**Netlify Free Plan capacity (corrected from previous "~5" estimate):**
+Free Plan supports **~50 domain aliases** with per-alias Let's Encrypt SSL — Pro is **not** required for Aleksa's expected scale (1-10 community partners). The distinction that misled me earlier: *Wildcard SSL* is Pro, but *Wildcard DNS* (CNAME `*.openpenguin.de` at IONOS) is a DNS standard and free everywhere. We don't need Wildcard SSL — every partner subdomain gets its own Let's Encrypt cert auto-provisioned by Netlify when the alias is added via API.
+
+ToS-Note: Reselling-Hosting on Free is gray-zone (officially Netlify requires Pro for reselling). For Aleksa's free Community-Perk model with 0-10 members this is fine; upgrade to Pro once the platform is monetized or partner count grows past ~30.
 
 **Required setup before this works:**
 - `NETLIFY_API_TOKEN` stored in Vault (Aleksa creates a Personal Access Token at https://app.netlify.com/user/applications)
 - `NETLIFY_SITE_ID` for the openpenguin.de site stored in Vault
-- Wildcard DNS `*.openpenguin.de` pointing to Netlify (Aleksa one-time DNS setup)
+- Wildcard CNAME `*.openpenguin.de` at IONOS pointing to the Netlify site host (one-time DNS setup — free, no Pro needed for the DNS record itself)
+
+Once the Vault secrets are in place, `agency-finalize-onboarding` Edge Function automatically POSTs to Netlify's `/sites/{id}` API to add the partner's `{slug}.openpenguin.de` as a domain alias on each successful wizard completion — no manual Aleksa-side click per partner.
 
 ## Onboarding wizard
 

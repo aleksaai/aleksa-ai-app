@@ -54,8 +54,8 @@ Full local build chain runs clean:
 |---|---|---|
 | **Put `STRIPE_CONNECT_CLIENT_ID` in Vault** | Supabase Dashboard → Database → Vault → New Secret. Name: `STRIPE_CONNECT_CLIENT_ID`, value: `ca_…` from Stripe Dashboard → Connect → Onboarding-Einstellungen | Without this, "Mit Stripe verbinden" button returns a clear "vault_missing" error. Everything else works. |
 | **Register Stripe OAuth redirect URI** | Stripe Dashboard → Connect → Onboarding-Einstellungen → Redirect URIs → add `https://platform.openpenguin.de/agency/settings/stripe-callback` | Required by Stripe to allow the OAuth flow. |
-| **Put `NETLIFY_API_TOKEN` + `NETLIFY_SITE_ID` in Vault** | Same pattern. Token from https://app.netlify.com/user/applications, site_id from your Netlify site settings | Enables custom-domain auto-alias-add via `verify-custom-domain`. Without these, DNS verification still works; you just add the Netlify alias manually. |
-| **Wildcard DNS `*.openpenguin.de` → Netlify** | Your DNS provider (Cloudflare/etc.) | Without it, partner subdomains don't resolve. Until then, partner can use `https://platform.openpenguin.de/agency` and the tenant-detection falls back to default brand. |
+| **Wildcard CNAME `*.openpenguin.de` → Netlify-Host** in IONOS | IONOS DNS-Verwaltung → CNAME mit Name `*` und Value = dein Netlify-Site-Host (z.B. `wonderful-frangipane-12345.netlify.app`, siehst du im Netlify Dashboard) | Free + Standard-DNS, **kein Netlify Pro nötig**. Catched alle Partner-Subdomains in einem Eintrag. |
+| **Put `NETLIFY_API_TOKEN` + `NETLIFY_SITE_ID` in Vault** | Supabase Dashboard → Database → Vault → New Secret. Token from https://app.netlify.com/user/applications | Mit beiden Secrets im Vault macht `agency-finalize-onboarding` Edge Function automatisch beim Wizard-Finalize einen Netlify-API-Call der die Partner-Subdomain als Domain-Alias hinzufügt → SSL provisioniert via Let's Encrypt in ~1-2 Min. Ohne Secrets: Subdomain ist nicht resolvbar, du fügst Alias manuell hinzu (oder Aleksa-side via Edge-Function-Log überwachen + nachreichen). Netlify Free reicht für ~50 Aliases (also bis ~50 Partner). |
 
 ### Quick end-to-end flow you can test right now
 

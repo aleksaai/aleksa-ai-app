@@ -2,11 +2,53 @@
 //
 // Called by the partner from the /agency-onboarding wizard final step.
 // Validates the slug, creates the agency row, upgrades their profile to
-// role='agency_owner', sets profile.agency_id, and marks the access_request
-// as fully consumed.
+// role='agency_owner', sets profile.agency_id, and (if Netlify secrets
+// are in Vault) automatically adds {slug}.openpenguin.de as a Netlify
+// domain alias so SSL provisions via Let's Encrypt — no Aleksa-side
+// manual click needed.
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
+
+const BASE_DOMAIN = 'openpenguin.de'
+
+async function vaultRead(sbAdmin: any, name: string): Promise<string | null> {
+  const { data, error } = await sbAdmin
+    .from('vault.decrypted_secrets' as any)
+    .select('decrypted_secret')
+    .eq('name', name)
+    .maybeSingle()
+  if (error) return null
+  return (data?.decrypted_secret as string | undefined) ?? null
+}
+
+async function netlifyAddDomainAlias(
+  netlifyToken: string,
+  netlifySiteId: string,
+  hostname: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const siteResp = await fetch(`https://api.netlify.com/api/v1/sites/${netlifySiteId}`, {
+    headers: { Authorization: `Bearer ${netlifyToken}` },
+  })
+  if (!siteResp.ok) return { ok: false, error: `netlify_get_site_failed: ${siteResp.status}` }
+  const site = await siteResp.json()
+  const existing = Array.isArray(site.domain_aliases) ? site.domain_aliases : []
+  if (existing.includes(hostname)) return { ok: true } // idempotent
+  const updated = [...existing, hostname]
+  const patchResp = await fetch(`https://api.netlify.com/api/v1/sites/${netlifySiteId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${netlifyToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ domain_aliases: updated }),
+  })
+  if (!patchResp.ok) {
+    const t = await patchResp.text()
+    return { ok: false, error: `netlify_patch_failed: ${patchResp.status} ${t.slice(0, 200)}` }
+  }
+  return { ok: true }
+}
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -112,6 +154,24 @@ Deno.serve(async (req) => {
       return json({ error: 'profile_update_failed', detail: profileErr.message }, 500)
     }
 
+    // Try to auto-add the partner's subdomain as a Netlify domain-alias.
+    // Free Plan supports ~50 aliases with per-alias Let's Encrypt SSL — no
+    // Wildcard-SSL (Pro) needed. Without Vault secrets we skip with a clear
+    // marker; Aleksa adds the alias manually until secrets land in Vault.
+    const partnerHostname = `${slug}.${BASE_DOMAIN}`
+    let subdomainProvisioning: 'auto_added' | 'skipped_no_secrets' | 'failed' = 'skipped_no_secrets'
+    let subdomainError: string | null = null
+    const netlifyToken = await vaultRead(sbAdmin, 'NETLIFY_API_TOKEN')
+    const netlifySiteId = await vaultRead(sbAdmin, 'NETLIFY_SITE_ID')
+    if (netlifyToken && netlifySiteId) {
+      const r = await netlifyAddDomainAlias(netlifyToken, netlifySiteId, partnerHostname)
+      if (r.ok) subdomainProvisioning = 'auto_added'
+      else {
+        subdomainProvisioning = 'failed'
+        subdomainError = r.error
+      }
+    }
+
     return json({
       ok: true,
       agency: {
@@ -119,6 +179,13 @@ Deno.serve(async (req) => {
         slug: agency.slug,
         display_name: agency.display_name,
         brand_color: agency.brand_color,
+      },
+      subdomain: {
+        hostname: partnerHostname,
+        provisioning: subdomainProvisioning,
+        error: subdomainError,
+        // SSL via Let's Encrypt takes 1-5 minutes after add. Partner should be
+        // shown a "SSL wird gerade ausgerollt" hint if auto_added.
       },
     })
   } catch (e) {
