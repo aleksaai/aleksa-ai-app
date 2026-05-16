@@ -1,6 +1,8 @@
 // Minimal hand-rolled DB types for the MVP.
 // (Auto-generated `supabase gen types` would be nicer — bring back when local CLI is available.)
 
+export type UserRole = 'admin' | 'customer_owner' | 'agency_owner'
+
 export type CustomerKind = 'voice_customer' | 'platform_member'
 
 export type Customer = {
@@ -11,16 +13,52 @@ export type Customer = {
   has_payment_method: boolean
   branding: Record<string, unknown>
   customer_kind: CustomerKind
+  agency_id: string | null
   created_at: string
   updated_at: string
 }
 
 export type Profile = {
   id: string
-  role: 'admin' | 'customer_owner'
+  role: UserRole
   customer_id: string | null
+  agency_id: string | null
   created_at: string
   updated_at: string
+}
+
+export type CustomDomainStatus = 'none' | 'pending_dns' | 'verified' | 'failed'
+export type StripeConnectStatus = 'none' | 'pending' | 'active' | 'disconnected'
+export type AgencyStatus = 'active' | 'suspended' | 'deleted'
+
+export type Agency = {
+  id: string
+  owner_user_id: string
+  slug: string
+  display_name: string
+  brand_color: string
+  logo_url: string | null
+  favicon_url: string | null
+  custom_domain: string | null
+  custom_domain_status: CustomDomainStatus
+  custom_domain_verified_at: string | null
+  stripe_connect_account_id: string | null
+  stripe_connect_status: StripeConnectStatus
+  max_customers: number
+  status: AgencyStatus
+  created_at: string
+  updated_at: string
+}
+
+// Subset of agency exposed to anonymous visitors for branding the page
+// before login. Returned by the SECURITY DEFINER `get_agency_branding` RPC.
+export type AgencyBranding = {
+  id: string
+  slug: string
+  display_name: string
+  brand_color: string
+  logo_url: string | null
+  favicon_url: string | null
 }
 
 export type PricingPlanType = 'per_minute' | 'flat' | 'hybrid' | 'one_time'

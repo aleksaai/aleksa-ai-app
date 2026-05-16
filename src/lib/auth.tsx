@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import type { UserRole } from '../types/db'
 
 type Profile = {
   id: string
-  role: 'admin' | 'customer_owner'
+  role: UserRole
   customer_id: string | null
+  agency_id: string | null
 }
 
 type AuthContextValue = {
@@ -47,10 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null)
       return
     }
-    // profiles table may not exist yet in Step 1 — silently ignore failure
     supabase
       .from('profiles')
-      .select('id, role, customer_id')
+      .select('id, role, customer_id, agency_id')
       .eq('id', session.user.id)
       .maybeSingle()
       .then(({ data }) => setProfile(data as Profile | null))
