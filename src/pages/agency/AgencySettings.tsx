@@ -7,10 +7,8 @@ import { useEffect, useState } from 'react'
 import { AgencyShell } from '../../components/AgencyShell'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
+import { verifyCustomDomain, stripeConnectStart, stripeConnectDisconnect } from '../../lib/api'
 import type { Agency } from '../../types/db'
-
-// Phase F: AgencySettings has editable Whitelabel tab now.
-// Domain + Payments tabs remain placeholder until Phase H + G land.
 
 type Tab = 'whitelabel' | 'domain' | 'payments'
 
@@ -322,7 +320,6 @@ function DomainTab({ agency, onUpdated }: { agency: Agency; onUpdated: (a: Agenc
     setError(null)
     setVerifyResult(null)
     try {
-      const { verifyCustomDomain } = await import('../../lib/api')
       const r = await verifyCustomDomain()
       if (r.ok) {
         setVerifyResult(r.note ?? 'DNS verifiziert.')
@@ -455,7 +452,6 @@ function PaymentsTab({ agency, onUpdated }: { agency: Agency; onUpdated: (a: Age
     setBusy('connect')
     setError(null)
     try {
-      const { stripeConnectStart } = await import('../../lib/api')
       const r = await stripeConnectStart(window.location.origin)
       // Redirect into Stripe's OAuth screen
       window.location.href = r.url
@@ -470,7 +466,6 @@ function PaymentsTab({ agency, onUpdated }: { agency: Agency; onUpdated: (a: Age
     setBusy('disconnect')
     setError(null)
     try {
-      const { stripeConnectDisconnect } = await import('../../lib/api')
       const r = await stripeConnectDisconnect()
       const { data } = await supabase.from('agencies').select('*').eq('id', agency.id).maybeSingle()
       if (data) onUpdated(data as Agency)
@@ -560,14 +555,3 @@ function Field({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ColorField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="label-soft mb-1.5">{label}</p>
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg border border-white/60 shadow-inner" style={{ background: value }} />
-        <code className="rounded bg-white/60 px-2 py-1 text-xs">{value}</code>
-      </div>
-    </div>
-  )
-}

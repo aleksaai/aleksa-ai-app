@@ -50,6 +50,15 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    to: '/agency/integrations',
+    label: 'Integrationen',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 7V2m6 5V2M5 13a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v3a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-3z" />
+      </svg>
+    ),
+  },
+  {
     to: '/agency/settings',
     label: 'Einstellungen',
     icon: (

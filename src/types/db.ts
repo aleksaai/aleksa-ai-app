@@ -90,6 +90,7 @@ export type Integration = {
   name: string
   platform: IntegrationPlatform
   region: IntegrationRegion | null
+  agency_id: string | null
   active: boolean
   created_at: string
   updated_at: string

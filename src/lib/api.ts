@@ -30,6 +30,62 @@ export async function adminApproveAsAgency(access_request_id: string): Promise<{
   return data as any
 }
 
+// ─── agency-create-integration (Multi-Tenant Phase E voll) ─────
+
+export type AgencyCreateIntegrationInput = CreateIntegrationInput
+
+export async function agencyCreateIntegration(input: AgencyCreateIntegrationInput) {
+  const { data, error } = await supabase.functions.invoke('agency-create-integration', { body: input })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data as { ok: true; integration: { id: string; name: string; platform: string; region: string | null } }
+}
+
+// ─── agency-list-platform-agents ───────────────────────────────
+
+export async function agencyListPlatformAgents(integration_id: string) {
+  const { data, error } = await supabase.functions.invoke('agency-list-platform-agents', { body: { integration_id } })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data as { ok: true; agents: ListedPlatformAgent[]; integration: { id: string; name: string; platform: string; region: string | null } }
+}
+
+// ─── agency-create-voice-agent ─────────────────────────────────
+
+export async function agencyCreateVoiceAgent(input: CreateVoiceAgentInput) {
+  const { data, error } = await supabase.functions.invoke('agency-create-voice-agent', { body: input })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Invalid response')
+  return data as { ok: true; agent: { id: string } }
+}
+
 // ─── Stripe Connect (Multi-Tenant Phase G) ─────────────────────
 
 export async function stripeConnectStart(origin?: string): Promise<{

@@ -25,6 +25,7 @@ import { AgencySettings } from './pages/agency/AgencySettings'
 import { AgencyOnboarding } from './pages/AgencyOnboarding'
 import { AgencyCustomerNew } from './pages/agency/AgencyCustomerNew'
 import { AgencyCustomerDetail } from './pages/agency/AgencyCustomerDetail'
+import { AgencyIntegrations } from './pages/agency/AgencyIntegrations'
 import { PlatformAdminAgencies } from './pages/PlatformAdminAgencies'
 import { PlatformAdminAgencyDetail } from './pages/PlatformAdminAgencyDetail'
 import { StripeConnectCallback } from './pages/StripeConnectCallback'
@@ -238,6 +239,14 @@ export default function App() {
         element={
           <RequireAuth>
             <AgencyAgents />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/agency/integrations"
+        element={
+          <RequireAuth>
+            <AgencyIntegrations />
           </RequireAuth>
         }
       />
