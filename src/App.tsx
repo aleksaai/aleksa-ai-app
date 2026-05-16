@@ -15,6 +15,8 @@ import { AgentDetail } from './pages/AgentDetail'
 import { CustomerAgentDetail } from './pages/CustomerAgentDetail'
 import { CallDetail } from './pages/CallDetail'
 import { ResetPassword } from './pages/ResetPassword'
+import { Signup } from './pages/Signup'
+import { Requests } from './pages/Requests'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -44,6 +46,15 @@ export default function App() {
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/invite/:token" element={<Invite />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route
+        path="/admin/requests"
+        element={
+          <RequireAuth>
+            <Requests />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/onboarding"
         element={

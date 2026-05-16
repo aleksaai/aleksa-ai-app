@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { supabase } from '../lib/supabase'
 import { AuthShell } from '../components/AuthShell'
@@ -238,6 +239,13 @@ export function Login() {
             {status === 'loading' ? 'Anmelden…' : 'Anmelden'}
           </button>
         </form>
+
+        <div className="border-t border-black/5 pt-4 text-center text-sm text-ink-muted">
+          Noch keinen Account?{' '}
+          <Link to="/signup" className="font-medium hover:[color:var(--accent-700)]">
+            Zugang anfragen →
+          </Link>
+        </div>
       </div>
     </AuthShell>
   )

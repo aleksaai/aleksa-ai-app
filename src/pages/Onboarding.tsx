@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { loadStripe, type Stripe } from '@stripe/stripe-js'
@@ -8,13 +8,29 @@ import { supabase } from '../lib/supabase'
 import { getSetupIntent, linkInvitation, updateCustomerBusiness } from '../lib/api'
 import { AuthShell } from '../components/AuthShell'
 
+type Phase = 'linking' | 'password' | 'loading' | 'ready' | 'success' | 'error'
+
 export function Onboarding() {
   const { user, signOut } = useAuth()
   const [searchParams] = useSearchParams()
-  const [phase, setPhase] = useState<'linking' | 'loading' | 'ready' | 'success' | 'error'>('linking')
+  const [phase, setPhase] = useState<Phase>('linking')
   const [errorMsg, setErrorMsg] = useState('')
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null)
+
+  // After password is set (or skipped via OAuth), proceed to Stripe setup
+  const proceedToStripe = async () => {
+    try {
+      setPhase('loading')
+      const r = await getSetupIntent()
+      setClientSecret(r.client_secret)
+      setStripePromise(loadStripe(r.publishable_key))
+      setPhase('ready')
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : String(e))
+      setPhase('error')
+    }
+  }
 
   useEffect(() => {
     if (!user) return
@@ -37,17 +53,24 @@ export function Onboarding() {
           throw new Error('Kein Invitation-Token gefunden. Bitte den Admin um eine neue Einladung.')
         }
 
-        setPhase('loading')
-        const r = await getSetupIntent()
-        setClientSecret(r.client_secret)
-        setStripePromise(loadStripe(r.publishable_key))
-        setPhase('ready')
+        // Skip password step if user authenticated via OAuth (Google, etc.)
+        // — they don't need a password.
+        const isOAuth = user.app_metadata?.provider && user.app_metadata.provider !== 'email'
+        const passwordAlreadySet = (user.user_metadata as Record<string, unknown> | undefined)
+          ?.password_set === true
+
+        if (isOAuth || passwordAlreadySet) {
+          await proceedToStripe()
+        } else {
+          setPhase('password')
+        }
       } catch (e) {
         setErrorMsg(e instanceof Error ? e.message : String(e))
         setPhase('error')
       }
     }
     run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, searchParams])
 
   return (
@@ -89,12 +112,109 @@ export function Onboarding() {
         </motion.div>
       )}
 
+      {phase === 'password' && (
+        <PasswordSetupForm
+          onDone={async () => {
+            await proceedToStripe()
+          }}
+        />
+      )}
+
       {phase === 'ready' && clientSecret && stripePromise && (
         <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
           <PaymentForm onSuccess={() => setPhase('success')} />
         </Elements>
       )}
     </AuthShell>
+  )
+}
+
+function PasswordSetupForm({ onDone }: { onDone: () => Promise<void> }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (password.length < 8) {
+      setError('Mindestens 8 Zeichen.')
+      return
+    }
+    if (password !== confirm) {
+      setError('Die Passwörter stimmen nicht überein.')
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    const { error: upErr } = await supabase.auth.updateUser({
+      password,
+      data: { password_set: true },
+    })
+    if (upErr) {
+      setError(upErr.message)
+      setSubmitting(false)
+      return
+    }
+    await onDone()
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <p className="eyebrow mb-1.5">Schritt 1 von 2</p>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Wähle ein <span className="heading-accent">Passwort</span>
+        </h1>
+        <p className="mt-1.5 text-sm text-ink-muted">
+          Damit du dich später jederzeit ohne Magic-Link anmelden kannst.
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="pw" className="label-soft mb-2 block">Passwort</label>
+        <input
+          id="pw"
+          type="password"
+          required
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Mindestens 8 Zeichen"
+          className="glass-input"
+          disabled={submitting}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="confirm" className="label-soft mb-2 block">Wiederholen</label>
+        <input
+          id="confirm"
+          type="password"
+          required
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          placeholder="••••••••"
+          className="glass-input"
+          disabled={submitting}
+        />
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={submitting || !password || !confirm}
+        className="btn-primary w-full"
+      >
+        {submitting ? 'Speichere…' : 'Weiter zu Zahlungsmethode'}
+      </button>
+    </form>
   )
 }
 
@@ -150,7 +270,7 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <p className="eyebrow mb-1.5">Schritt 1 von 1</p>
+        <p className="eyebrow mb-1.5">Schritt 2 von 2</p>
         <h1 className="text-2xl font-semibold tracking-tight">
           <span className="heading-accent">Zahlungsmethode</span> hinterlegen
         </h1>
