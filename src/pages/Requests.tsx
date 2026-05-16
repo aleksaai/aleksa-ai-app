@@ -44,8 +44,15 @@ export function Requests() {
     setBusy(req.id)
     setError(null)
     try {
-      // Trigger existing customer-creation flow → sends Magic-Link
-      await adminCreateCustomer({ name: req.name, contact_email: req.email })
+      // Trigger existing customer-creation flow → sends Magic-Link.
+      // Approved access-requests are community members (not paying voice customers),
+      // so we tag them as platform_member — that skips Stripe creation AND hides
+      // them from the regular /admin customers list.
+      await adminCreateCustomer({
+        name: req.name,
+        contact_email: req.email,
+        kind: 'platform_member',
+      })
       // Mark request as approved
       const { data: { user } } = await supabase.auth.getUser()
       await supabase

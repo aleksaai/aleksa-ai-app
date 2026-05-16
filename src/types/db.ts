@@ -1,6 +1,8 @@
 // Minimal hand-rolled DB types for the MVP.
 // (Auto-generated `supabase gen types` would be nicer — bring back when local CLI is available.)
 
+export type CustomerKind = 'voice_customer' | 'platform_member'
+
 export type Customer = {
   id: string
   name: string
@@ -8,6 +10,7 @@ export type Customer = {
   stripe_customer_id: string | null
   has_payment_method: boolean
   branding: Record<string, unknown>
+  customer_kind: CustomerKind
   created_at: string
   updated_at: string
 }

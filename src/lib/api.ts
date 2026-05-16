@@ -7,6 +7,7 @@ import { supabase } from './supabase'
 export type CreateCustomerInput = {
   name: string
   contact_email: string
+  kind?: 'voice_customer' | 'platform_member'
 }
 
 export type CreateCustomerResult = {

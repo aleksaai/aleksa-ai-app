@@ -111,6 +111,16 @@ export function CustomerDetail() {
         <div className="glass-card p-10 text-center text-sm text-ink-muted">Lade…</div>
       ) : !customer ? (
         <div className="glass-card p-10 text-center text-sm text-red-700">Kunde nicht gefunden.</div>
+      ) : customer.customer_kind === 'platform_member' ? (
+        <div className="glass-card-lg mx-auto max-w-md p-8 text-center">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Plattform-<span className="heading-accent">Mitglied</span>
+          </h2>
+          <p className="mt-2 text-sm text-ink-muted">
+            Dies ist ein OpenPeng-Community-Mitglied mit eigenem Account.
+            Du hast keinen Zugriff auf deren Daten — sie betreiben ihr eigenes Whitelabel-Setup.
+          </p>
+        </div>
       ) : (
         <>
           {/* ============ HERO ============ */}

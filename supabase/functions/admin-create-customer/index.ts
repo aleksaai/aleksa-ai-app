@@ -63,28 +63,36 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
     const name = (body.name ?? '').toString().trim()
     const contactEmail = (body.contact_email ?? '').toString().trim().toLowerCase()
+    const kind = (body.kind ?? 'voice_customer').toString() as 'voice_customer' | 'platform_member'
+    if (!['voice_customer', 'platform_member'].includes(kind)) {
+      return json({ error: 'invalid_kind' }, 400)
+    }
     if (!name || !contactEmail) {
       return json({ error: 'name_and_contact_email_required' }, 400)
     }
 
-    // ── 3. Stripe Customer (with metadata for Lisa-filter) ──
-    const stripeRes = await fetch('https://api.stripe.com/v1/customers', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        name,
-        email: contactEmail,
-        'metadata[source]': 'aleksa-ai-app',
-      }),
-    })
-    if (!stripeRes.ok) {
-      const detail = await stripeRes.text()
-      return json({ error: 'stripe_customer_creation_failed', detail }, 500)
+    // ── 3. Stripe Customer — only for voice_customer (community members don't pay us) ──
+    let stripeCustomerId: string | null = null
+    if (kind === 'voice_customer') {
+      const stripeRes = await fetch('https://api.stripe.com/v1/customers', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          name,
+          email: contactEmail,
+          'metadata[source]': 'aleksa-ai-app',
+        }),
+      })
+      if (!stripeRes.ok) {
+        const detail = await stripeRes.text()
+        return json({ error: 'stripe_customer_creation_failed', detail }, 500)
+      }
+      const stripeCustomer = await stripeRes.json()
+      stripeCustomerId = stripeCustomer.id
     }
-    const stripeCustomer = await stripeRes.json()
 
     // ── 4. Insert Customer row ──
     const { data: customer, error: custErr } = await supabaseAdmin
@@ -92,7 +100,8 @@ Deno.serve(async (req) => {
       .insert({
         name,
         contact_email: contactEmail,
-        stripe_customer_id: stripeCustomer.id,
+        stripe_customer_id: stripeCustomerId,
+        customer_kind: kind,
       })
       .select()
       .single()
@@ -195,7 +204,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       customer_id: customer.id,
-      stripe_customer_id: stripeCustomer.id,
+      stripe_customer_id: stripeCustomerId,
       invitation_token: token,
       invite_link: magicLink, // direct magic link now (was /invite/:token before)
       email_sent: emailSent,

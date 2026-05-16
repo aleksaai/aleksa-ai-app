@@ -15,9 +15,12 @@ export function Admin() {
 
   const loadAll = async () => {
     setLoading(true)
+    // Only show real voice-agent customers — platform members (community signups)
+    // live in /admin/requests, not here.
     const { data } = await supabase
       .from('customers')
       .select('*')
+      .eq('customer_kind', 'voice_customer')
       .order('created_at', { ascending: false })
     setCustomers((data ?? []) as Customer[])
     setLoading(false)
