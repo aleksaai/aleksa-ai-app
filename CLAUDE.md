@@ -13,7 +13,7 @@
 
 The two use-cases coexist via the **`customers.customer_kind`** column (`voice_customer` for #1, `platform_member` for #2). See `HANDOFF.md` for the full migration plan.
 
-**Live:** **`platform.openpeng.de`** (was `app.aleksa.ai` before 2026-05-16)
+**Live:** **`platform.openpenguin.de`** (Sub-Domains `{slug}.openpenguin.de` für Partner; Custom-Domains per Agency möglich, z.B. `start.ki-hochschule.de`)
 **GitHub:** [`aleksaai/aleksa-ai-app`](https://github.com/aleksaai/aleksa-ai-app)
 **Local Path:** `~/Desktop/Projects/aleksa-ai-app/`
 **Supabase Project:** `puimwizupgkdvxpanlhy` (separate Account `aleksa@spalevic-consulting.de`, NICHT claude-team's)
@@ -45,7 +45,7 @@ Auf Macs MIT Node: `npm install && npm run dev` reicht.
 | `.env.local` (gitignored, local-dev only) | `SUPABASE_PERSONAL_ACCESS_TOKEN`, `STRIPE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, etc. |
 | `.env.production` (committed) | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — both public by design |
 | Netlify Build Env | `NODE_VERSION=22` (set in `netlify.toml`) |
-| Supabase Secrets (`puimwizupgkdvxpanlhy`) | `RESEND_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `ELEVENLABS_WEBHOOK_SECRET`, `APP_URL`, `CRON_SECRET` |
+| Supabase Secrets (`puimwizupgkdvxpanlhy`) | `RESEND_API_KEY`, `STRIPE_SECRET_KEY` (live), `STRIPE_PUBLISHABLE_KEY` (live), `STRIPE_WEBHOOK_SECRET` (live), `STRIPE_CONNECT_CLIENT_ID` (`ca_TFKLcU5...` live), `ELEVENLABS_WEBHOOK_SECRET`, `APP_URL` (`https://platform.openpenguin.de`), `CRON_SECRET`, `NETLIFY_API_TOKEN`, `NETLIFY_SITE_ID`, `MGMT_API_PAT` (für verify-custom-domain → Auth-Allowlist patch) |
 
 🚨 **Never commit** `.env.local`, Service Role Keys, or Personal Access Tokens.
 

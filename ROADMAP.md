@@ -55,6 +55,22 @@ Partners-Onboarding ist End-to-End live. Aleksa kann jetzt Community-Member als 
 47. ✅ Partner voice-agent CRUD: `/agency/integrations` page (own ElevenLabs/Retell keys via `agency-create-integration`), inline AssignVoiceAgentForm in customer detail (`agency-list-platform-agents` + `agency-create-voice-agent`)
 48. ✅ Platform-admin override UI: `/platform-admin/agencies` list + detail with suspend/reactivate, force-disconnect Stripe, manual custom-domain verify
 
+### V5 "Phase 1c Hardening — Multi-Tenant End-to-End Bug-Sweep" (2026-05-16 spät)
+
+39. ✅ Customer-Invite routing: `agency-create-customer` `redirectTo` jetzt auf `{tenantUrl}/onboarding?...` (Partner-Subdomain oder Custom-Domain), Email-HTML mit `agency.brand_color` + `agency.logo_url`
+40. ✅ Auth `uri_allow_list` erweitert: `https://*.openpenguin.de/**` + `https://start.ki-hochschule.de/**`
+41. ✅ `verify-custom-domain` Auto-add custom-domain zur Auth Allowlist (neues Secret `MGMT_API_PAT`)
+42. ✅ **Stripe Connect Live-Mode aktiviert**: Live Client ID + Live API Keys + Live Webhook konfiguriert, `APP_URL` Secret korrigiert (`openpeng.de` → `openpenguin.de`)
+43. ✅ `stripe-connect-start` mit `always_prompt=true` → kein Auto-Connect mit cached Stripe-Session
+44. ✅ **Neuer Google OAuth Client** im separaten Cloud-Project `openpenguin` (External, Basic-Scopes) statt Internal-Lisa-Client → Partner können sich einloggen
+45. ✅ **Partner-Übersicht (`/agency`) komplett umgebaut**: mirror `Admin.tsx` — Search + Kunden-Cards + "Neuer Kunde", keine Stats/Whitelabel-Box/Stripe-Box
+46. ✅ Sidebar-Cleanup: "Kunden" raus (Übersicht IST Kunden), "Voice-Agents" → "Agenten", **"Pricing" rein**
+47. ✅ **`agency-create-pricing-plan` Edge Function** + Page `AgencyPricing.tsx`: Stripe-Product/Prices auf Connected Account (via `Stripe-Account` Header), Migration 011 (`pricing_plans.stripe_account_id`)
+48. ✅ **Whitelabel-Branding überall**: AuthShell + CustomerShell ziehen Logo+Name aus `useTenant()`, CustomerShell-Header zeigt Partner-Brand statt Customer-Name, Favicon-Fallback auf `logo_url`
+49. ✅ **Customer Payment Setup auf Connected Account**: `agency-create-customer` legt Stripe-Customer auf Partner-Konto an, `setup-intent` agency-aware, neue `confirm-setup-intent` Edge Function (Connected Account Webhook-Substitute), Migration 012 (`customers.stripe_account_id`)
+50. ✅ **PaymentSetupForm.tsx** mit Stripe Elements + `stripeAccount` param; `Onboarding.tsx` mit neuer `payment` phase (conditional)
+51. ✅ Platform-Admin Overview-Pages scope auf Master-Only: `.is('agency_id', null)` in Admin/AgentsList/Integrations/PricingPlans
+
 ### V3 "OpenPenguin Voice Rebrand + Community-Member Onboarding" (2026-05-16)
 
 29. ✅ Rebrand AleksaAI → **OpenPenguin Voice** (UI, page title, email templates)

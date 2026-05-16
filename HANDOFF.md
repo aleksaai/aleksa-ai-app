@@ -4,7 +4,119 @@
 
 ## Last update
 
-**2026-05-16 (late session)** — Marcus (Phase 1b end-of-session sweep: prereqs all done, several follow-up bugs found + patched during initial end-to-end test, one bug fix not yet verified by Aleksa. See "Phase 1b — verification status" section below.)
+**2026-05-16 (Phase 1c session, später Abend)** — Marcus (Customer-Invite-Routing, Live-Mode-Stripe-Switch, Whitelabel-Header, Partner-Pricing auf Connected Accounts, Customer-Payment-Setup auf Connected Account, Admin-Overview Master-Scoping). Siehe Section "Was wurde in dieser Session gemacht (2026-05-16 Phase 1c)" unten.
+
+## Was wurde in dieser Session gemacht (2026-05-16 Phase 1c)
+
+End-to-End-Test mit Aleksas erstem echtem Partner-Account (`aleksa-t1` Agency, Custom-Domain `start.ki-hochschule.de`) hat eine ganze Reihe Bugs zutage gefördert. Alle gefixt + deployed.
+
+### 1. Customer-Invite ging immer auf platform.openpenguin.de statt Partner-Domain
+- `agency-create-customer` baute `redirectTo` aus `APP_URL` statt aus `tenantUrl`. Customer landete im OpenPenguin-Default-Branding.
+- **Fix:** `onboardingUrl = ${tenantUrl}/onboarding?...`. Email-HTML nutzt jetzt `agency.brand_color` für Button + Link, `agency.logo_url` als Header-Bild.
+- **Plus:** Supabase Auth `uri_allow_list` erweitert via Management API: `https://*.openpenguin.de/**` + `https://start.ki-hochschule.de/**`. Ohne das hätte Supabase jeden Magic-Link auf platform fallback'd.
+- **Plus:** `verify-custom-domain` Edge Function fügt jetzt jede neu verifizierte Custom-Domain auto zur Auth-Allowlist hinzu (via neues Edge Function Secret `MGMT_API_PAT`).
+
+### 2. Stripe Connect Live-Mode aktiviert
+- Aleksa hat Stripe Connect Live-Mode-Setup im Stripe Dashboard durchgeführt (Connect Setup Wizard: "Sellers collect directly", "Onboarding hosted by Stripe", "Stripe Dashboard für Account Management", "Stripe manages risk").
+- Live Client ID: `ca_TFKLcU5us87H6ju9d0XplkyJClw21pH0` (im Edge Function Secret `STRIPE_CONNECT_CLIENT_ID` deployed).
+- Live API Keys + Live Webhook Secret in Supabase eingetragen (Aleksa selbst).
+- Live Webhook `webhook-stripe` registriert in Stripe mit 6 Events: `setup_intent.succeeded`, `customer.subscription.{created,updated,deleted}`, `invoice.{paid,payment_failed}`.
+- Live Redirect URI im Stripe Live-Mode eingetragen.
+- **`always_prompt=true`** zu `stripe-connect-start` hinzugefügt → Stripe zeigt immer Account-Picker statt One-Click-Connect mit cached Session. Verhindert dass Partner versehentlich Aleksas Master-Account verbindet.
+- **APP_URL Secret** korrigiert: war noch `https://platform.openpeng.de` (alte Domain) → jetzt `https://platform.openpenguin.de`. Das hat sich als Invalid-Redirect-URI-Error bei Stripe geäußert.
+
+### 3. Google OAuth: neuer separater Cloud-Project
+- Bisheriger OAuth-Client "Lisa Bookkeeping Agent" (claude-team-bezogen) ist **Internal-only** → externe Partner kriegen `403 org_internal`.
+- **Lösung:** Separates Google Cloud Project `openpenguin` angelegt mit eigenem OAuth Client, External + In-Production-Modus, nur Basic-Scopes (keine Verification nötig).
+- Neuer Client: ID `639947266950-addlqvc1ttbn00j200mmkv0o4718jmnr.apps.googleusercontent.com`, Authorized Redirect URI `https://puimwizupgkdvxpanlhy.supabase.co/auth/v1/callback`.
+- Supabase Auth Google Provider Config via Management API gewechselt — Lisa-OAuth-Setup im claude-team-Supabase ist **unangetastet**.
+
+### 4. Partner-Übersicht komplett umgebaut (analog Master /admin)
+- `AgencyHome.tsx` war ein Stats-Dashboard + Onboarding-Box-Wand. Aleksas Feedback: "ich sehe das im Master-Acc auch nicht so".
+- **Neu:** Mirror von `Admin.tsx` — Search-Bar + Kunden-Cards + "Neuer Kunde" Button. Keine Stats, kein Whitelabel-Banner, keine Stripe-Hinweis-Box.
+- `AgencyShell` Sidebar: separater "Kunden"-Eintrag raus (Übersicht IST jetzt Kunden), "Voice-Agents" → "Agenten" (Master-Sprache), **"Pricing" rein**.
+- `/agency/customers` → `<Navigate to="/agency" replace />` (Detail-Routes `/agency/customers/:id` + `/agency/customers/new` bleiben).
+- `AgencyCustomerNew` + `AgencyCustomerDetail` `backTo`-Links auf `/agency` umgestellt.
+
+### 5. Partner-Pricing-Plans auf eigenem Stripe Connect Account
+- Neue Edge Function **`agency-create-pricing-plan`**: Mirror von `admin-create-pricing-plan` aber nutzt `Stripe-Account: <connected_account_id>` Header bei jedem Stripe-API-Call. Stripe Product + Prices landen auf Partner-Konto, NICHT auf Master.
+- Schema: **Migration 011** — `pricing_plans.stripe_account_id text` (NULL = Master-Account).
+- Neue Page **`AgencyPricing.tsx`** gated auf `stripe_connect_status === 'active'`: wenn Stripe nicht verbunden → "Verbinde zuerst Stripe" CTA statt Create-Button.
+- `NewPricingPlanDialog` erweitert um `scope: 'admin' | 'agency'` prop — switched zwischen `adminCreatePricingPlan` und `agencyCreatePricingPlan`.
+
+### 6. Whitelabel-Branding im AuthShell + CustomerShell
+- AuthShell (Login/Onboarding-Seiten) hatte `<img src="/logo-color.png">` + `"OpenPenguin Voice"` hartcodiert. **Fix:** `useTenant()` → `agency.logo_url ?? '/logo-color.png'` + `agency.display_name ?? 'OpenPenguin Voice'`.
+- CustomerShell-Header zeigte vorher `customerName` (Endkunde-eigener Name) als Header-Text. **Fix:** zeigt jetzt **Partner-Brand** (Agency-Display-Name + Logo) — der Kunde sieht durch wen er gekauft hat. Sein eigener Name lebt nur noch im Page-Content.
+- Plus: `TenantProvider` fallback `favicon_url ?? logo_url` — Partner muss kein separates Favicon hochladen, Logo wird automatisch Browser-Tab-Icon.
+
+### 7. Customer Payment Setup auf Connected Account
+- `agency-create-customer` erweitert: legt jetzt einen **Stripe-Customer auf dem Connected Account** an (via `Stripe-Account` Header) sofern Agency `stripe_connect_status='active'`. Speichert `customers.stripe_customer_id` + `customers.stripe_account_id`.
+- Schema: **Migration 012** — `customers.stripe_account_id text` (NULL = Platform).
+- `setup-intent` Edge Function: agency-aware. Wenn `customer.stripe_account_id` set → SetupIntent mit `Stripe-Account` header auf Connected Account; sonst Platform (unverändert für Master-Customers).
+- Neue Edge Function **`confirm-setup-intent`**: Connected Account Stripe Events kommen NICHT bei "Your account" Webhook an. Diese Function macht server-side was der Webhook macht: SetupIntent validieren → Payment Method als Default setzen (mit Stripe-Account header) → `customers.has_payment_method=true` flippen. Idempotent zum Webhook.
+- Neue React-Komponente **`PaymentSetupForm.tsx`** mit Stripe Elements. Kritisch: `loadStripe(pk, { stripeAccount: ... })` mit dem Connected Account, sonst tokenisiert Elements auf Platform und der PaymentMethod wäre unbrauchbar.
+- `Onboarding.tsx`: neue Phase `payment` zwischen `password` und `success`. Conditional: nur wenn `customer_kind='voice_customer'` + `!has_payment_method` + `stripe_customer_id` set. Master-Customers ohne Stripe-Setup skippen Payment-Phase wie bisher.
+
+### 8. Platform-Admin sah Partner-Customer-Daten (RLS-Leak im UI)
+- Aleksa: "Warum sehe ich auf meinem Master-Account die Kunden meines Partner-Accounts?"
+- RLS-Policy für `admin` Role erlaubt absichtlich Cross-Tenant-Read (für Support via `/platform-admin/agencies` → Agency-Detail). Aber die 4 Admin-Übersichts-Pages filterten nicht.
+- **Fix:** `.is('agency_id', null)` in `Admin.tsx`, `AgentsList.tsx`, `Integrations.tsx`, `PricingPlans.tsx`. Aleksa sieht jetzt nur Master-Daten, Partner-Daten weiter zugänglich via `/platform-admin/agencies/:id`.
+
+## Phase 1c — was Aleksa beim Live-Test noch entdeckt hat (Stand Session-Ende)
+
+### Stripe Connect Account muss vom Partner komplett onboarded sein
+Aleksa hat als Test-Customer versucht eine Karte hinzuzufügen → Stripe Fehler: `"This Connect account cannot currently make live charges. The requirements.disabled_reason property on the account will provide information..."`. **Das ist kein Code-Bug** — der Stripe-Account den der Partner via OAuth verbunden hat, hat sein Stripe-Onboarding (KYC, Bank-Details, Business-Info) nicht abgeschlossen. Stripe blockiert Charges bis `charges_enabled: true`. Partner muss im Stripe Dashboard sein Konto vervollständigen.
+
+**Future:** Diagnose-Edge-Function bauen die `GET /v1/accounts/{id}` aufruft und `requirements.disabled_reason` + `currently_due` Liste an den Partner zeigt im Settings → Zahlungen UI. Aktuell muss der Partner selbst zu stripe.com gehen.
+
+### Bestehende Test-Customers haben keine stripe_customer_id
+Customers die VOR den Phase-1c-Commits angelegt wurden haben `stripe_customer_id=null` + `stripe_account_id=null` → bei denen wird kein Payment-Step gezeigt. Wenn Aleksa die nachträglich charging-fähig machen will → entweder neu anlegen oder eine kleine Edge Function `agency-backfill-stripe-customer` bauen die für existierende customers den Stripe-Customer-Object nachzieht.
+
+## Phase 1c commits (chronological)
+
+```
+f9ff396 Scope platform-admin overview pages to master rows only (filter out agency_id)
+8c89b73 Collect customer payment method during onboarding (Connected Stripe account)
+f6f397a AuthShell + CustomerShell pull logo/name from TenantProvider (whitelabel everywhere)
+db0c165 Mirror master overview on partner side + agency-scoped pricing plans on connected Stripe
+62fa1ef Force Stripe Connect account picker (always_prompt) — no cached-session auto-connect
+bc0034d Route customer invites to partner domain + auto-update auth allowlist on domain verify
+2649c6e Use logo_url as favicon fallback when favicon_url is null
+```
+
+## Neue / geänderte Edge Functions in Phase 1c
+
+| Function | Status | Was |
+|---|---|---|
+| `agency-create-customer` | modified | redirectTo→tenantUrl, brand-color/logo im Email, Stripe Customer auf Connected Account |
+| `verify-custom-domain` | modified | auto-add custom domain zu Auth uri_allow_list via MGMT_API_PAT |
+| `stripe-connect-start` | modified | `always_prompt=true` query param |
+| `agency-create-pricing-plan` | NEW | Mirror admin-create-pricing-plan mit Stripe-Account header → Connected Account |
+| `setup-intent` | modified | agency-aware: Stripe-Account header wenn customer.stripe_account_id set |
+| `confirm-setup-intent` | NEW | server-side equivalent zu setup_intent.succeeded webhook für Connected Accounts |
+| `webhook-stripe` | redeployed | nur Cold-Start für neuen Live Signing Secret |
+
+## Neue Edge Function Secrets
+
+- `MGMT_API_PAT` = `sbp_17468f...05e6245` (für verify-custom-domain → Management API → Auth allowlist patch)
+- `APP_URL` updated: `https://platform.openpenguin.de`
+- `STRIPE_CONNECT_CLIENT_ID` updated: `ca_TFKLcU5us87H6ju9d0XplkyJClw21pH0` (Live)
+- `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` / `STRIPE_WEBHOOK_SECRET` updated auf Live (Aleksa selbst)
+
+## DB Schema Änderungen Phase 1c
+
+- Migration **011**: `pricing_plans.stripe_account_id text` (NULL = Platform Master)
+- Migration **012**: `customers.stripe_account_id text` (NULL = Platform Master)
+- Beide Migrations sind via Management API direkt auf der DB ausgeführt (keine `supabase db push` nötig).
+
+## Supabase Auth Config Phase 1c
+
+- `uri_allow_list`: `https://platform.openpenguin.de/**, https://*.openpenguin.de/**, https://start.ki-hochschule.de/**`
+- Google Provider: neuer External-OAuth-Client (Cloud-Project `openpenguin`, Client `639947266950-addlqvc1ttbn00j200mmkv0o4718jmnr.apps.googleusercontent.com`)
+
+---
+
+
 
 ## Phase 1b — verification status (snapshot 2026-05-16 17:00)
 
