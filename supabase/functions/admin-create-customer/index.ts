@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
     try {
       const resend = new Resend(RESEND_API_KEY)
       const r = await resend.emails.send({
-        from: 'OpenPenguin Voice <noreply@projekt.aleksa.ai>',
+        from: 'OpenPenguin Voice <noreply@admin.openpenguin.de>',
         to: contactEmail,
         subject: `Willkommen bei OpenPenguin Voice — ${name}`,
         html: `
