@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { supabase } from '../lib/supabase'
-import { adminCreateCustomer } from '../lib/api'
+import { adminApproveAsAgency } from '../lib/api'
 import { AppShell } from '../components/AppShell'
 
 type AccessRequest = {
@@ -44,25 +44,10 @@ export function Requests() {
     setBusy(req.id)
     setError(null)
     try {
-      // Trigger existing customer-creation flow → sends Magic-Link.
-      // Approved access-requests are community members (not paying voice customers),
-      // so we tag them as platform_member — that skips Stripe creation AND hides
-      // them from the regular /admin customers list.
-      await adminCreateCustomer({
-        name: req.name,
-        contact_email: req.email,
-        kind: 'platform_member',
-      })
-      // Mark request as approved
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase
-        .from('access_requests')
-        .update({
-          status: 'approved',
-          processed_at: new Date().toISOString(),
-          processed_by: user?.id ?? null,
-        })
-        .eq('id', req.id)
+      // Phase I (Multi-Tenant): approval sends a magic-link to /agency-onboarding.
+      // The wizard creates the agency + upgrades profile to agency_owner.
+      // The Edge Function itself marks the access_request as approved.
+      await adminApproveAsAgency(req.id)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

@@ -22,6 +22,7 @@ import { AgencyHome } from './pages/agency/AgencyHome'
 import { AgencyCustomers } from './pages/agency/AgencyCustomers'
 import { AgencyAgents } from './pages/agency/AgencyAgents'
 import { AgencySettings } from './pages/agency/AgencySettings'
+import { AgencyOnboarding } from './pages/AgencyOnboarding'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -169,6 +170,14 @@ export default function App() {
         }
       />
       {/* ============ AGENCY OWNER (PARTNER) ROUTES ============ */}
+      <Route
+        path="/agency-onboarding"
+        element={
+          <RequireAuth>
+            <AgencyOnboarding />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/agency"
         element={

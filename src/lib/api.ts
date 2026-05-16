@@ -4,6 +4,62 @@
 
 import { supabase } from './supabase'
 
+// ─── admin-approve-as-agency (Multi-Tenant Phase I) ────────────
+
+export async function adminApproveAsAgency(access_request_id: string): Promise<{
+  ok: true
+  access_request_id: string
+  invite_link: string
+  email_sent: boolean
+  email_error: string | null
+}> {
+  const { data, error } = await supabase.functions.invoke('admin-approve-as-agency', {
+    body: { access_request_id },
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Unexpected response')
+  return data as any
+}
+
+// ─── agency-finalize-onboarding (Multi-Tenant Phase I) ─────────
+
+export type AgencyFinalizeInput = {
+  request_id?: string
+  slug: string
+  display_name: string
+  brand_color: string
+}
+
+export async function agencyFinalizeOnboarding(input: AgencyFinalizeInput): Promise<{
+  ok: true
+  agency: { id: string; slug: string; display_name: string; brand_color: string }
+}> {
+  const { data, error } = await supabase.functions.invoke('agency-finalize-onboarding', {
+    body: input,
+  })
+  if (error) {
+    try {
+      const ctx = (error as any).context
+      if (ctx?.json) {
+        const body = await ctx.json()
+        throw new Error(`${body?.error ?? 'error'}${body?.detail ? ': ' + body.detail : ''}`)
+      }
+    } catch {}
+    throw new Error(error.message)
+  }
+  if (!data || !(data as any).ok) throw new Error('Unexpected response')
+  return data as any
+}
+
 export type CreateCustomerInput = {
   name: string
   contact_email: string
