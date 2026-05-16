@@ -4,7 +4,64 @@
 
 ## Last update
 
-**2026-05-16** — Marcus (major rebrand to OpenPenguin Voice + new domain + new auth/signup flow + interim platform_member separation)
+**2026-05-16** — Marcus (Multi-Tenant Phase 1 partial ship: agencies table + RLS, tenant detection + branding, onboarding wizard, partner customer mgmt, whitelabel editor, custom domain verification. Stripe Connect + platform-admin override deferred to Phase 1b.)
+
+## Multi-Tenant Phase 1 — what's live (2026-05-16, V4)
+
+End-to-end partner-onboarding flow is functional:
+
+1. Public `/signup` → access_request stored
+2. Aleksa @ `/admin/requests` → "Genehmigen & Einladen" → calls `admin-approve-as-agency` Edge Function → partner gets branded email from `noreply@admin.openpenguin.de` with one-click magic-link → `/agency-onboarding?request_id=…`
+3. Partner runs 3-step wizard: pick slug (live-availability checked via `check_slug_availability` RPC) → pick display name + brand color → confirm → `agency-finalize-onboarding` Edge Function creates agency, upgrades profile to `agency_owner`, redirects partner to `https://{slug}.openpenguin.de/agency`
+4. Partner dashboard at `/agency`: stats overview + nav to Customers / Agents / Settings
+5. Partner creates customers via `/agency/customers/new` → `agency-create-customer` Edge Function → customer with `agency_id` set + invitation email
+6. Partner whitelabels at `/agency/settings` (Whitelabel tab): edit `display_name`, `brand_color`, upload logo to `agency-branding` Storage bucket — RLS-scoped to own folder. Page reload applies new palette via `TenantProvider`.
+7. Partner sets custom domain at `/agency/settings` (Domain tab): enters `app.kihelden.de`, gets CNAME instruction, clicks "Verifizieren" → `verify-custom-domain` Edge Function does DNS lookup via Cloudflare DoH → status flips to `verified`. Netlify-alias-add hooks in if `NETLIFY_API_TOKEN` + `NETLIFY_SITE_ID` are in Vault.
+
+### What's NOT done in Phase 1 (deferred to Phase 1b)
+
+- **Stripe Connect** — partners can't yet collect their own customer payments. Aleksa handles billing manually. ~2-3h next-session work.
+- **Platform-admin override UI** — Aleksa can't yet impersonate agencies via UI. He still has DB access + admin RLS bypass. ~1h next-session work.
+- **Partner-side voice-agent CRUD** — list is read-only, partner can't yet assign agents to customers from `/agency`. Aleksa handles via existing `/admin/agents` flow (RLS now permits him to touch any agency's customers). ~1-2h next-session work.
+- **Auto-provisioning Netlify subdomain wildcard** — `*.openpenguin.de` DNS must be wildcard-pointed at Netlify; until then new subdomains don't resolve. Aleksa one-time DNS setup needed.
+
+### Vault secrets needed (Phase 1b prereqs)
+
+- `NETLIFY_API_TOKEN` (PAT from https://app.netlify.com/user/applications) — for custom-domain auto-alias-add
+- `NETLIFY_SITE_ID` (Netlify site ID for the openpenguin.de site) — same
+- `STRIPE_CONNECT_CLIENT_ID` (from Stripe Connect settings, format `ca_…`) — for Phase G
+
+Pattern: drop them in Supabase Dashboard → Vault. Marcus' Edge Functions read via `vault.decrypted_secrets` (Phase H already uses this pattern).
+
+### New Edge Functions deployed this session
+
+| Slug | Purpose |
+|---|---|
+| `admin-approve-as-agency` | Approve access_request + send agency-onboarding magic-link |
+| `agency-finalize-onboarding` | Wizard final step: create agency row + upgrade profile |
+| `agency-create-customer` | Partner creates customer under their agency |
+| `verify-custom-domain` | DNS lookup + Netlify-alias add (graceful degradation if Netlify secrets missing) |
+
+### New migrations applied
+
+| File | What |
+|---|---|
+| `008_multi_tenant_phase1.sql` | agencies table, agency_id columns, agency_owner enum, RLS rewrites |
+| `009_public_agency_lookup.sql` | Public SECURITY DEFINER RPCs `get_agency_branding(hostname)` + `check_slug_availability(slug)` |
+| `010_agency_branding_storage.sql` | Storage RLS on agency-branding bucket (partner writes own folder, public reads) |
+
+### Quick verification path (Aleksa)
+
+1. Open `https://platform.openpenguin.de/admin/requests` — should see existing access_requests.
+2. If there's no pending request: send a test signup from `/signup` with a real email you control.
+3. Click "Genehmigen & Einladen" → should see "Eingeladen" pill on the row + an email arriving from `noreply@admin.openpenguin.de`.
+4. Click the magic-link in email → land on `/agency-onboarding?request_id=…`.
+5. Pick slug like `test-partner` → next → pick display name + color → confirm → page redirects to `https://test-partner.openpenguin.de/agency`.
+6. ⚠️ The redirect target depends on wildcard DNS `*.openpenguin.de` being live at Netlify. If you haven't set up the wildcard, subdomain won't resolve — for now use `https://platform.openpenguin.de/agency` directly to test the dashboard.
+
+---
+
+
 
 ## Current state
 
