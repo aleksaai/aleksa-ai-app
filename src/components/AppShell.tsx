@@ -143,12 +143,21 @@ export function AppShell({
 
           <div className="m-3 rounded-2xl bg-white/40 p-4 backdrop-blur-md">
             <p className="truncate text-xs font-medium text-ink-soft">{user?.email}</p>
-            <button
-              onClick={signOut}
-              className="mt-2 text-xs font-medium text-ink-muted transition-colors hover:opacity-100 hover:[color:var(--accent-700)]"
-            >
-              Abmelden →
-            </button>
+            <div className="mt-2 flex items-center gap-3 text-xs font-medium">
+              <Link
+                to="/account"
+                className="text-ink-muted transition-colors hover:opacity-100 hover:[color:var(--accent-700)]"
+              >
+                Konto
+              </Link>
+              <span className="text-ink-dim">·</span>
+              <button
+                onClick={signOut}
+                className="text-ink-muted transition-colors hover:opacity-100 hover:[color:var(--accent-700)]"
+              >
+                Abmelden
+              </button>
+            </div>
           </div>
         </aside>
 

@@ -64,9 +64,14 @@ export function CustomerShell({
                 ← Zurück zum Admin
               </button>
             ) : (
-              <button onClick={signOut} className="btn-ghost text-sm">
-                Abmelden
-              </button>
+              <>
+                <Link to="/account" className="btn-ghost text-sm">
+                  Konto
+                </Link>
+                <button onClick={signOut} className="btn-ghost text-sm">
+                  Abmelden
+                </button>
+              </>
             )}
           </div>
         </div>

@@ -17,6 +17,7 @@ import { CallDetail } from './pages/CallDetail'
 import { ResetPassword } from './pages/ResetPassword'
 import { Signup } from './pages/Signup'
 import { Requests } from './pages/Requests'
+import { Account } from './pages/Account'
 
 function HomeRedirect() {
   const { user, profile, loading } = useAuth()
@@ -52,6 +53,14 @@ export default function App() {
         element={
           <RequireAuth>
             <Requests />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/account"
+        element={
+          <RequireAuth>
+            <Account />
           </RequireAuth>
         }
       />
