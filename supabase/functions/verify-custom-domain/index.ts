@@ -39,6 +39,38 @@ async function lookupCname(domain: string): Promise<string | null> {
   return target || null
 }
 
+async function addToAuthAllowlist(
+  pat: string,
+  projectRef: string,
+  domain: string,
+): Promise<{ ok: true; already: boolean } | { ok: false; error: string }> {
+  // GET current auth config to read existing uri_allow_list
+  const getResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/config/auth`, {
+    headers: { Authorization: `Bearer ${pat}` },
+  })
+  if (!getResp.ok) {
+    return { ok: false, error: `mgmt_get_auth_failed: ${getResp.status}` }
+  }
+  const cfg = await getResp.json()
+  const current = (cfg.uri_allow_list ?? '').toString()
+  const entries = current.split(',').map((s: string) => s.trim()).filter(Boolean)
+  const newEntry = `https://${domain}/**`
+  if (entries.includes(newEntry)) {
+    return { ok: true, already: true }
+  }
+  entries.push(newEntry)
+  const patchResp = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/config/auth`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uri_allow_list: entries.join(',') }),
+  })
+  if (!patchResp.ok) {
+    const t = await patchResp.text()
+    return { ok: false, error: `mgmt_patch_failed: ${patchResp.status} ${t.slice(0, 200)}` }
+  }
+  return { ok: true, already: false }
+}
+
 async function addNetlifyDomainAlias(
   netlifyToken: string,
   netlifySiteId: string,
@@ -144,6 +176,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Also add the custom domain to Supabase Auth redirect allowlist so magic-link
+    // and OAuth redirects to https://<custom-domain>/** are accepted. Without this,
+    // Supabase silently falls back to site_url (=platform.openpenguin.de) and
+    // partner-customers end up on the platform domain, seeing OpenPenguin branding.
+    let authAllowlistResult: 'added' | 'already_present' | 'skipped_no_pat' | 'failed' = 'skipped_no_pat'
+    let authAllowlistError: string | null = null
+    const mgmtPat = Deno.env.get('MGMT_API_PAT')
+    const projectRef = (SUPABASE_URL.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) ?? [])[1]
+    if (mgmtPat && projectRef) {
+      const r = await addToAuthAllowlist(mgmtPat, projectRef, agency.custom_domain)
+      if (r.ok) authAllowlistResult = r.already ? 'already_present' : 'added'
+      else {
+        authAllowlistResult = 'failed'
+        authAllowlistError = r.error
+      }
+    }
+
     await sbAdmin
       .from('agencies')
       .update({
@@ -158,6 +207,8 @@ Deno.serve(async (req) => {
       cname_expected: expected,
       netlify: netlifyResult,
       netlify_error: netlifyError,
+      auth_allowlist: authAllowlistResult,
+      auth_allowlist_error: authAllowlistError,
       note: netlifyResult === 'skipped_no_secrets'
         ? 'DNS verifiziert. Aleksa muss die Domain als Netlify Domain-Alias manuell hinzufügen (oder NETLIFY_API_TOKEN + NETLIFY_SITE_ID in Vault setzen für Auto-Add).'
         : netlifyResult === 'added'

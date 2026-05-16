@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     // Load agency for branding in email
     const { data: agency } = await sbAdmin
       .from('agencies')
-      .select('display_name, slug, custom_domain, max_customers')
+      .select('display_name, slug, custom_domain, max_customers, brand_color, logo_url')
       .eq('id', profile.agency_id)
       .maybeSingle()
     if (!agency) return json({ error: 'agency_not_found' }, 404)
@@ -97,10 +97,14 @@ Deno.serve(async (req) => {
       agency_id: profile.agency_id,
     })
 
-    // Build the tenant URL the partner uses (custom_domain wins over slug if set + verified)
+    // Build the tenant URL the partner uses (custom_domain wins over slug if set + verified).
+    // The customer must land on the partner's domain so TenantProvider applies the
+    // partner's branding (logo, brand color, title). APP_URL would route them to
+    // platform.openpenguin.de and they'd see OpenPenguin's default branding.
     const tenantHost = agency.custom_domain ?? `${agency.slug}.openpenguin.de`
     const tenantUrl = `https://${tenantHost}`
-    const onboardingUrl = `${APP_URL}/onboarding?invitation_token=${token}`
+    const onboardingUrl = `${tenantUrl}/onboarding?invitation_token=${token}`
+    void APP_URL
 
     // Generate magic-link
     let magicLink: string | null = null
@@ -136,6 +140,13 @@ Deno.serve(async (req) => {
 
     // Send email (partner-branded subject + sender, but still using OpenPenguin's
     // verified domain admin.openpenguin.de in the From header).
+    const brandColor = (agency as any).brand_color && /^#[0-9a-fA-F]{6}$/.test((agency as any).brand_color)
+      ? (agency as any).brand_color
+      : '#65A4FF'
+    const logoUrl = (agency as any).logo_url as string | null
+    const logoBlock = logoUrl
+      ? `<img src="${logoUrl}" alt="${agency.display_name}" style="max-height: 48px; max-width: 200px; margin-bottom: 16px;" />`
+      : ''
     let emailSent = false
     let emailError: string | null = null
     try {
@@ -146,18 +157,19 @@ Deno.serve(async (req) => {
         subject: `Willkommen bei ${agency.display_name} — ${name}`,
         html: `
           <div style="font-family: Inter, -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+            ${logoBlock}
             <h1 style="font-size: 24px; margin: 0 0 16px;">Hallo ${name},</h1>
             <p style="font-size: 16px; line-height: 1.5; color: #475569;">
               du wurdest zu <strong>${agency.display_name}</strong> freigeschaltet — der Plattform für deine Voice-Agent-Verwaltung.
             </p>
             <p style="margin: 24px 0;">
-              <a href="${magicLink}" style="display: inline-block; background: #65A4FF; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
+              <a href="${magicLink}" style="display: inline-block; background: ${brandColor}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
                 Konto aktivieren &rarr;
               </a>
             </p>
             <p style="font-size: 14px; color: #64748b;">
               Ein Klick reicht — du wirst automatisch angemeldet und durchs Onboarding geführt.
-              Deine Plattform läuft unter <a href="${tenantUrl}">${tenantHost}</a>.
+              Deine Plattform läuft unter <a href="${tenantUrl}" style="color: ${brandColor};">${tenantHost}</a>.
             </p>
             <p style="font-size: 12px; color: #94a3b8; margin-top: 32px;">
               Der Link läuft in 7 Tagen ab. Falls Probleme, melde dich beim ${agency.display_name}-Team.
