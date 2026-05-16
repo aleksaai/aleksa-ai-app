@@ -1,6 +1,13 @@
 // admin-create-customer Edge Function
 // Called by /admin UI to onboard a new customer.
-// Flow: verify admin → create Stripe Customer → insert DB row → generate invitation token → send email.
+// Flow:
+//   1. Verify admin
+//   2. Create Stripe Customer
+//   3. Insert DB row
+//   4. Insert invitation token
+//   5. Generate a Supabase magic-link that authenticates the user and lands
+//      them directly on /onboarding?invitation_token=… (one-click)
+//   6. Send the magic-link via Resend with our branded email
 
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.0'
@@ -91,7 +98,7 @@ Deno.serve(async (req) => {
       .single()
     if (custErr) return json({ error: 'customer_insert_failed', detail: custErr.message }, 500)
 
-    // ── 5. Invitation token ──
+    // ── 5. Invitation token (still kept for linkInvitation lookups in onboarding) ──
     const token = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
     const { error: invErr } = await supabaseAdmin.from('customer_invitations').insert({
@@ -102,33 +109,73 @@ Deno.serve(async (req) => {
     })
     if (invErr) return json({ error: 'invitation_insert_failed', detail: invErr.message }, 500)
 
-    // ── 6. Email via Resend (non-fatal if it fails — but return detail to admin) ──
+    // ── 6. Generate Supabase magic-link directly to onboarding ──
+    const onboardingUrl = `${APP_URL}/onboarding?invitation_token=${token}`
+    let magicLink: string | null = null
+    let linkErrMsg: string | null = null
+
+    // Try 'invite' first (creates auth user if not exists)
+    const { data: invLink, error: invLinkErr } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'invite',
+      email: contactEmail,
+      options: {
+        redirectTo: onboardingUrl,
+        data: { invitation_token: token },
+      },
+    })
+    if (invLinkErr) {
+      // Fallback: user already exists → use 'magiclink' type instead
+      const isExistsErr =
+        invLinkErr.message?.toLowerCase().includes('already') ||
+        invLinkErr.code === 'email_exists' ||
+        (invLinkErr as any).status === 422
+      if (isExistsErr) {
+        const { data: ml, error: mlErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: contactEmail,
+          options: { redirectTo: onboardingUrl },
+        })
+        if (mlErr) {
+          linkErrMsg = `magiclink: ${mlErr.message}`
+        } else {
+          magicLink = (ml as any)?.properties?.action_link ?? null
+        }
+      } else {
+        linkErrMsg = `invite: ${invLinkErr.message}`
+      }
+    } else {
+      magicLink = (invLink as any)?.properties?.action_link ?? null
+    }
+
+    if (!magicLink) {
+      return json({ error: 'magic_link_generation_failed', detail: linkErrMsg ?? 'no link returned' }, 500)
+    }
+
+    // ── 7. Email via Resend ──
     let emailSent = false
     let emailError: string | null = null
     try {
       const resend = new Resend(RESEND_API_KEY)
-      const inviteLink = `${APP_URL}/invite/${token}`
       const r = await resend.emails.send({
-        from: 'AleksaAI App <noreply@projekt.aleksa.ai>',
+        from: 'OpenPeng Voice <noreply@projekt.aleksa.ai>',
         to: contactEmail,
-        subject: `Einladung zur AleksaAI App — ${name}`,
+        subject: `Willkommen bei OpenPeng Voice — ${name}`,
         html: `
           <div style="font-family: Inter, -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
             <h1 style="font-size: 24px; margin: 0 0 16px;">Hallo,</h1>
             <p style="font-size: 16px; line-height: 1.5; color: #475569;">
-              du wurdest zur AleksaAI App eingeladen — der Plattform für deine Voice-Agent-Verwaltung.
+              du wurdest zu <strong>OpenPeng Voice</strong> freigeschaltet — der Plattform für deine Voice-Agent-Verwaltung.
             </p>
             <p style="margin: 24px 0;">
-              <a href="${inviteLink}" style="display: inline-block; background: #66A4FF; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
-                Konto aktivieren
+              <a href="${magicLink}" style="display: inline-block; background: #65A4FF; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">
+                Konto aktivieren &rarr;
               </a>
             </p>
             <p style="font-size: 14px; color: #64748b;">
-              Oder kopier diesen Link in deinen Browser: <br>
-              <code style="font-size: 12px;">${inviteLink}</code>
+              Ein Klick reicht — du wirst automatisch angemeldet und durchs Onboarding geführt.
             </p>
             <p style="font-size: 12px; color: #94a3b8; margin-top: 32px;">
-              Der Link läuft in 7 Tagen ab.
+              Der Link läuft in 24 Stunden ab. Falls er nicht funktioniert, bitte den Admin um eine neue Einladung.
             </p>
           </div>
         `,
@@ -150,7 +197,7 @@ Deno.serve(async (req) => {
       customer_id: customer.id,
       stripe_customer_id: stripeCustomer.id,
       invitation_token: token,
-      invite_link: `${APP_URL}/invite/${token}`,
+      invite_link: magicLink, // direct magic link now (was /invite/:token before)
       email_sent: emailSent,
       email_error: emailError,
     })

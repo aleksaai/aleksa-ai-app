@@ -32,7 +32,7 @@ export function Account() {
 
   const loadIdentities = async () => {
     setLoading(true)
-    const { data } = await supabase.auth.getUserIdentities()
+    const { data } = await (supabase.auth as any).getUserIdentities()
     if (data?.identities) setIdentities(data.identities as Identity[])
     setLoading(false)
   }
@@ -47,7 +47,7 @@ export function Account() {
   const handleLinkGoogle = async () => {
     setBusy('link-google')
     setError('')
-    const { error: e } = await supabase.auth.linkIdentity({
+    const { error: e } = await (supabase.auth as any).linkIdentity({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/account` },
     })
@@ -67,7 +67,7 @@ export function Account() {
     if (!confirm('Google-Verknüpfung aufheben? Du kannst sie jederzeit neu verknüpfen.')) return
     setBusy('unlink-google')
     setError('')
-    const { error: e } = await supabase.auth.unlinkIdentity(googleIdentity as never)
+    const { error: e } = await (supabase.auth as any).unlinkIdentity(googleIdentity)
     if (e) {
       setError(e.message)
     } else {

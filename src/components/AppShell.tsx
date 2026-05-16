@@ -94,7 +94,7 @@ export function AppShell({
       <div className="relative z-20 flex items-center justify-between px-4 py-3 lg:hidden">
         <Link to="/admin" className="flex items-center gap-2">
           <Logo />
-          <span className="text-base font-semibold tracking-tight">AleksaAI</span>
+          <span className="text-base font-semibold tracking-tight">OpenPeng Voice</span>
         </Link>
         <button
           aria-label="Menü"
@@ -114,7 +114,7 @@ export function AppShell({
             <Link to="/admin" className="flex items-center gap-2.5">
               <Logo />
               <div className="flex flex-col leading-none">
-                <span className="text-base font-semibold tracking-tight text-ink">AleksaAI</span>
+                <span className="text-base font-semibold tracking-tight text-ink">OpenPeng Voice</span>
                 <span
                   className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] opacity-80"
                   style={{ color: 'var(--accent-700)' }}
@@ -182,7 +182,7 @@ export function AppShell({
                 <div className="px-6 py-6">
                   <Link to="/admin" onClick={() => setMobileOpen(false)} className="flex items-center gap-2.5">
                     <Logo />
-                    <span className="text-base font-semibold tracking-tight">AleksaAI</span>
+                    <span className="text-base font-semibold tracking-tight">OpenPeng Voice</span>
                   </Link>
                 </div>
                 <nav className="flex-1 space-y-1 px-3">
@@ -254,6 +254,6 @@ export function AppShell({
 
 function Logo() {
   return (
-    <img src="/logo-color.png" alt="AleksaAI" className="h-11 w-11 shrink-0 object-contain" />
+    <img src="/logo-color.png" alt="OpenPeng Voice" className="h-11 w-11 shrink-0 object-contain" />
   )
 }

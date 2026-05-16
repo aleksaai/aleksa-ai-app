@@ -43,7 +43,7 @@ export function CustomerShell({
             <Logo />
             <div className="flex flex-col leading-none">
               <span className="text-base font-semibold tracking-tight text-ink">
-                {customerName ?? 'AleksaAI'}
+                {customerName ?? 'OpenPeng Voice'}
               </span>
               {adminPreview && (
                 <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-amber-700">
@@ -117,6 +117,6 @@ export function CustomerShell({
 
 function Logo() {
   return (
-    <img src="/logo-color.png" alt="AleksaAI" className="h-11 w-11 shrink-0 object-contain" />
+    <img src="/logo-color.png" alt="OpenPeng Voice" className="h-11 w-11 shrink-0 object-contain" />
   )
 }

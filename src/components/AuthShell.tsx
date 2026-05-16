@@ -20,8 +20,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
       >
         {/* Logo above card */}
         <div className="mb-6 flex flex-col items-center text-center">
-          <img src="/logo-color.png" alt="AleksaAI" className="mb-3 h-20 w-20 object-contain" />
-          <p className="text-sm font-semibold tracking-tight text-ink">AleksaAI</p>
+          <img src="/logo-color.png" alt="OpenPeng Voice" className="mb-3 h-20 w-20 object-contain" />
+          <p className="text-sm font-semibold tracking-tight text-ink">OpenPeng Voice</p>
         </div>
 
         <div className="glass-card-lg p-7">{children}</div>
