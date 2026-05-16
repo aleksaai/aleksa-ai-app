@@ -72,12 +72,18 @@ Deno.serve(async (req) => {
     // Redirect target — fixed to platform host so it works regardless of tenant
     const redirectUri = `${APP_URL}/agency/settings/stripe-callback`
 
+    // `always_prompt=true` forces Stripe to show the account picker even if the
+    // user is already logged into a Stripe Dashboard in this browser. Without
+    // it, Stripe silently auto-connects whatever account is in-session — which
+    // is wrong for a Connect platform: partners must explicitly pick / log
+    // into their OWN Stripe account, not whichever happens to be cached.
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
       scope: 'read_write',
       redirect_uri: redirectUri,
       state,
+      always_prompt: 'true',
     })
     const url = `https://connect.stripe.com/oauth/authorize?${params.toString()}`
 
